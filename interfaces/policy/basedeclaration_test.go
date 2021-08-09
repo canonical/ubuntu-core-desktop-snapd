@@ -809,6 +809,7 @@ var (
 		"online-accounts-service":   {"app"},
 		"power-control":             {"core"},
 		"ppp":                       {"core"},
+		"polkit-agent":              {"core"},
 		"pulseaudio":                {"app", "core"},
 		"pwm":                       {"core", "gadget"},
 		"qualcomm-ipc-router":       {"core"},
@@ -987,6 +988,7 @@ func (s *baseDeclSuite) TestPlugInstallation(c *C) {
 		"packagekit-control":     true,
 		"personal-files":         true,
 		"polkit":                 true,
+		"polkit-agent":           true,
 		"sd-control":             true,
 		"snap-refresh-control":   true,
 		"snap-themes-control":    true,
@@ -1241,6 +1243,7 @@ func (s *baseDeclSuite) TestValidity(c *C) {
 		"pkcs11":                 true,
 		"posix-mq":               true,
 		"polkit":                 true,
+		"polkit-agent":           true,
 		"sd-control":             true,
 		"shared-memory":          true,
 		"snap-refresh-control":   true,
@@ -1643,6 +1646,24 @@ plugs:
 `
 
 	snapDecl := s.mockSnapDecl(c, "some-snap", "some-snap-with-desktop-launch-id", "canonical", plugsSlots)
+	cand.PlugSnapDeclaration = snapDecl
+	_, err = cand.CheckAutoConnect()
+	c.Check(err, IsNil)
+}
+
+func (s *baseDeclSuite) TestAutoConnectionPolkitAgentOverride(c *C) {
+	cand := s.connectCand(c, "polkit-agent", "", "")
+	_, err := cand.CheckAutoConnect()
+	c.Check(err, NotNil)
+	c.Assert(err, ErrorMatches, "auto-connection denied by plug rule of interface \"polkit-agent\"")
+
+	plugsSlots := `
+plugs:
+  polkit-agent:
+    allow-auto-connection: true
+`
+
+	snapDecl := s.mockSnapDecl(c, "some-snap", "some-snap-with-polkit-agent-id", "canonical", plugsSlots)
 	cand.PlugSnapDeclaration = snapDecl
 	_, err = cand.CheckAutoConnect()
 	c.Check(err, IsNil)
