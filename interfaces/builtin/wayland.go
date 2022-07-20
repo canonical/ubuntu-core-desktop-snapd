@@ -107,7 +107,7 @@ owner /{dev,run}/shm/###PLUG_SECURITY_TAGS###.wayland.mozilla.ipc.[0-9]* rw,
 
 const waylandConnectedPlugAppArmor = `
 # Allow access to the Wayland compositor server socket
-owner /run/user/[0-9]*/wayland-[0-9]* rw,
+owner /run/user/[0-9]*/{,*/}wayland-[0-9]* rw,
 
 # Needed when using QT_QPA_PLATFORM=wayland-egl (MESA dri config)
 /etc/drirc r,
