@@ -100,8 +100,7 @@ func implicitSystemPermanentSlot(slot *snap.SlotInfo) bool {
 // isPermanentSlotSystemSlot(), the slot can be owned by the system or an
 // application.
 func implicitSystemConnectedSlot(slot *interfaces.ConnectedSlot) bool {
-	if release.OnClassic &&
-		(slot.Snap().Type() == snap.TypeOS || slot.Snap().Type() == snap.TypeSnapd) {
+	if slot.Snap().Type() == snap.TypeOS || slot.Snap().Type() == snap.TypeSnapd {
 		return true
 	}
 	return false
