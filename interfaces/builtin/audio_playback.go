@@ -59,6 +59,8 @@ owner /{,var/}run/pulse/native rwk,
 owner /{,var/}run/pulse/pid r,
 owner /{,var/}run/user/[0-9]*/ r,
 owner /{,var/}run/user/[0-9]*/pulse/ rw,
+owner /{,var/}run/user/[0-9]*/pulse/native rwk,
+owner /{,var/}run/user/[0-9]*/pulse/pid r,
 
 /run/udev/data/c116:[0-9]* r,
 /run/udev/data/+sound:card[0-9]* r,
@@ -138,6 +140,7 @@ func (iface *audioPlaybackInterface) StaticInfo() interfaces.StaticInfo {
 	return interfaces.StaticInfo{
 		Summary:              audioPlaybackSummary,
 		ImplicitOnClassic:    true,
+		ImplicitOnCore:       true,
 		BaseDeclarationSlots: audioPlaybackBaseDeclarationSlots,
 	}
 }
