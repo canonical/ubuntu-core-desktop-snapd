@@ -20,6 +20,8 @@
 package builtin
 
 import (
+	"fmt"
+
 	"github.com/snapcore/snapd/interfaces"
 	"github.com/snapcore/snapd/interfaces/apparmor"
 	"github.com/snapcore/snapd/interfaces/seccomp"
@@ -140,13 +142,24 @@ func (iface *audioPlaybackInterface) StaticInfo() interfaces.StaticInfo {
 	return interfaces.StaticInfo{
 		Summary:              audioPlaybackSummary,
 		ImplicitOnClassic:    true,
-		ImplicitOnCore:       true,
 		BaseDeclarationSlots: audioPlaybackBaseDeclarationSlots,
 	}
 }
 
 func (iface *audioPlaybackInterface) AppArmorConnectedPlug(spec *apparmor.Specification, plug *interfaces.ConnectedPlug, slot *interfaces.ConnectedSlot) error {
 	spec.AddSnippet(audioPlaybackConnectedPlugAppArmor)
+
+	if slot.Snap().SnapName() != "snapd" {
+		// This enables audio in Core Desktop, by giving access to the
+		// sockets inside the snap's own folder.
+		instanceName := slot.Snap().InstanceName()
+		coreAppArmor := fmt.Sprintf(`
+owner /run/user/[0-9]*/snap.%s/pulse/ rw,
+owner /run/user/[0-9]*/snap.%s/pulse/native rwk,
+owner /run/user/[0-9]*/snap.%s/pulse/pid r,
+`, instanceName, instanceName, instanceName)
+		spec.AddSnippet(coreAppArmor)
+	}
 	if release.OnClassic {
 		spec.AddSnippet(audioPlaybackConnectedPlugAppArmorDesktop)
 	}
@@ -162,6 +175,13 @@ func (iface *audioPlaybackInterface) UDevPermanentSlot(spec *udev.Specification,
 
 func (iface *audioPlaybackInterface) AppArmorPermanentSlot(spec *apparmor.Specification, slot *snap.SlotInfo) error {
 	spec.AddSnippet(audioPlaybackPermanentSlotAppArmor)
+	if !release.OnClassic {
+		// This allows to share screen in Core Desktop
+		spec.AddSnippet(`
+owner /run/user/[0-9]*/pipewire-[0-9] rwk,
+`)
+	}
+
 	return nil
 }
 
