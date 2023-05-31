@@ -20,7 +20,7 @@
 package builtin
 
 import (
-	"fmt"
+	"strings"
 
 	"github.com/snapcore/snapd/interfaces"
 	"github.com/snapcore/snapd/interfaces/apparmor"
@@ -80,6 +80,12 @@ owner @{HOME}/.config/pulse/cookie rk,
 owner /{,var/}run/user/*/pulse/ rwk,
 owner /{,var/}run/user/*/pulse/native rwk,
 owner /{,var/}run/user/*/pulse/pid r,
+`
+
+const audioPlaybackConnectedPlugAppArmorCore = `
+owner /run/user/[0-9]*/###PLUG_SECURITY_TAGS###/pulse/ r,
+owner /run/user/[0-9]*/###PLUG_SECURITY_TAGS###/pulse/native rwk,
+owner /run/user/[0-9]*/###PLUG_SECURITY_TAGS###/pulse/pid r,
 `
 
 const audioPlaybackConnectedPlugSecComp = `
@@ -142,6 +148,7 @@ func (iface *audioPlaybackInterface) StaticInfo() interfaces.StaticInfo {
 	return interfaces.StaticInfo{
 		Summary:              audioPlaybackSummary,
 		ImplicitOnClassic:    true,
+		ImplicitOnCore:       false,
 		BaseDeclarationSlots: audioPlaybackBaseDeclarationSlots,
 	}
 }
@@ -149,19 +156,14 @@ func (iface *audioPlaybackInterface) StaticInfo() interfaces.StaticInfo {
 func (iface *audioPlaybackInterface) AppArmorConnectedPlug(spec *apparmor.Specification, plug *interfaces.ConnectedPlug, slot *interfaces.ConnectedSlot) error {
 	spec.AddSnippet(audioPlaybackConnectedPlugAppArmor)
 
-	if slot.Snap().SnapName() != "snapd" {
-		// This enables audio in Core Desktop, by giving access to the
-		// sockets inside the snap's own folder.
-		instanceName := slot.Snap().InstanceName()
-		coreAppArmor := fmt.Sprintf(`
-owner /run/user/[0-9]*/snap.%s/pulse/ rw,
-owner /run/user/[0-9]*/snap.%s/pulse/native rwk,
-owner /run/user/[0-9]*/snap.%s/pulse/pid r,
-`, instanceName, instanceName, instanceName)
-		spec.AddSnippet(coreAppArmor)
-	}
 	if release.OnClassic {
 		spec.AddSnippet(audioPlaybackConnectedPlugAppArmorDesktop)
+	}
+	if !implicitSystemConnectedSlot(slot) {
+		old := "###PLUG_SECURITY_TAGS###"
+		new := "snap." + slot.Snap().InstanceName() // forms the snap-instance-specific subdirectory name of /run/user/*/ used for XDG_RUNTIME_DIR
+		snippet := strings.Replace(audioPlaybackConnectedPlugAppArmorCore, old, new, -1)
+		spec.AddSnippet(snippet)
 	}
 	return nil
 }
