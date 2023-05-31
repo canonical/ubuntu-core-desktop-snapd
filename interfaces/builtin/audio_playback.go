@@ -70,9 +70,10 @@ owner /{,var/}run/user/[0-9]*/pulse/pid r,
 
 const audioPlaybackConnectedPlugAppArmorDesktop = `
 # Allow communicating with pulseaudio service on the desktop in classic distro.
-# Only on desktop do we need access to /etc/pulse for any PulseAudio client
+# Only on desktop do we need global access to /etc/pulse for any PulseAudio client
 # to read available client side configuration settings. On an Ubuntu Core
-# device those things will be stored inside the snap directory.
+# device those things will be stored inside the snap directory, so only the snap
+# implementing the slot needs it.
 /etc/pulse/ r,
 /etc/pulse/** r,
 owner @{HOME}/.pulse-cookie rk,
@@ -119,6 +120,16 @@ owner /{,var/}run/pulse/** rwk,
 owner /run/pulse/native/ rwk,
 owner /run/user/[0-9]*/ r,
 owner /run/user/[0-9]*/pulse/ rw,
+`
+
+const audioPlaybackPermanentSlotAppArmorCore = `
+# This allows to share screen in Core Desktop
+owner /run/user/[0-9]*/pipewire-[0-9] rwk,
+
+# This allows to read the wireplumber configuration if
+# pipewire runs inside the container
+/etc/pulse/ r,
+/etc/pulse/** r,
 `
 
 const audioPlaybackPermanentSlotSecComp = `
@@ -179,9 +190,7 @@ func (iface *audioPlaybackInterface) AppArmorPermanentSlot(spec *apparmor.Specif
 	spec.AddSnippet(audioPlaybackPermanentSlotAppArmor)
 	if !release.OnClassic {
 		// This allows to share screen in Core Desktop
-		spec.AddSnippet(`
-owner /run/user/[0-9]*/pipewire-[0-9] rwk,
-`)
+		spec.AddSnippet(audioPlaybackPermanentSlotAppArmorCore)
 	}
 
 	return nil
