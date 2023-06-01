@@ -78,7 +78,7 @@ const audioPlaybackConnectedPlugAppArmorDesktop = `
 /etc/pulse/** r,
 owner @{HOME}/.pulse-cookie rk,
 owner @{HOME}/.config/pulse/cookie rk,
-owner /{,var/}run/user/*/pulse/ rwk,
+owner /{,var/}run/user/*/pulse/ rk,
 owner /{,var/}run/user/*/pulse/native rwk,
 owner /{,var/}run/user/*/pulse/pid r,
 `
