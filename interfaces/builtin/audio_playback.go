@@ -188,7 +188,7 @@ func (iface *audioPlaybackInterface) UDevPermanentSlot(spec *udev.Specification,
 
 func (iface *audioPlaybackInterface) AppArmorPermanentSlot(spec *apparmor.Specification, slot *snap.SlotInfo) error {
 	spec.AddSnippet(audioPlaybackPermanentSlotAppArmor)
-	if !release.OnClassic {
+	if !implicitSystemPermanentSlot(slot) {
 		// This allows to share screen in Core Desktop
 		spec.AddSnippet(audioPlaybackPermanentSlotAppArmorCore)
 	}
