@@ -60,7 +60,7 @@ owner /{,var/}run/pulse/ r,
 owner /{,var/}run/pulse/native rwk,
 owner /{,var/}run/pulse/pid r,
 owner /{,var/}run/user/[0-9]*/ r,
-owner /{,var/}run/user/[0-9]*/pulse/ rw,
+owner /{,var/}run/user/[0-9]*/pulse/ r,
 owner /{,var/}run/user/[0-9]*/pulse/native rwk,
 owner /{,var/}run/user/[0-9]*/pulse/pid r,
 
