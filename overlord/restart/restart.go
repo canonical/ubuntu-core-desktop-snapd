@@ -23,6 +23,7 @@
 package restart
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,6 +38,7 @@ import (
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/overlord/state"
 	"github.com/snapcore/snapd/release"
+	userclient "github.com/snapcore/snapd/usersession/client"
 )
 
 type RestartType int
@@ -375,6 +377,20 @@ func notifyRebootRequiredClassic(rebootRequiredSnap string) error {
 	return nil
 }
 
+func asyncNotifyRebootRequiredCoreDesktop(context context.Context, client *userclient.Client, rebootRequiredInfo *userclient.RebootRequiredInfo) {
+	logger.Debugf("notifying agents about reboot required")
+	go func() {
+		if err := client.RebootRequiredNotification(context, rebootRequiredInfo); err != nil {
+			logger.Noticef("Cannot send notification about reboot required: %v", err)
+		}
+	}()
+}
+
+func notifyRebootRequiredCoreDesktop(rebootRequiredSnap string) {
+	rebootRequiredInfo := userclient.RebootRequiredInfo{InstanceName: rebootRequiredSnap}
+	asyncNotifyRebootRequiredCoreDesktop(context.TODO(), userclient.New(), &rebootRequiredInfo)
+}
+
 // Pending returns whether a restart was requested with Request and of which type.
 func Pending(st *state.State) (bool, RestartType) {
 	cached := st.Cached(restartManagerKey{})
@@ -402,7 +418,7 @@ func ReplaceBootID(st *state.State, bootID string) {
 func markTaskForRestart(t *state.Task, status state.Status, setTaskToWait bool) {
 	// XXX: Preserve previous restart behavior for classic in the undo cases, is this still
 	// necessary?
-	if release.OnClassic && (status == state.UndoStatus || status == state.UndoneStatus) {
+	if (release.OnClassic || release.OnCoreDesktop) && (status == state.UndoStatus || status == state.UndoneStatus) {
 		t.Change().Set("pending-system-restart", nil)
 		t.SetStatus(status)
 		t.Logf("Skipped automatic system restart on classic system when undoing changes back to previous state")
@@ -601,6 +617,11 @@ func processRestartForChange(chg *state.Change, old, new state.Status) {
 		if err := notifyRebootRequiredClassic(rp.SnapName); err != nil {
 			logger.Noticef("cannot notify about pending reboot: %v", err)
 		}
+		logger.Noticef("Postponing restart until a manual system restart allows to continue")
+		return
+	}
+	if release.OnCoreDesktop {
+		notifyRebootRequiredCoreDesktop(rp.SnapName)
 		logger.Noticef("Postponing restart until a manual system restart allows to continue")
 		return
 	}
