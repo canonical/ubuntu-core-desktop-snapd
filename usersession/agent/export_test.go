@@ -30,6 +30,7 @@ var (
 	PendingRefreshNotificationCmd = pendingRefreshNotificationCmd
 	FinishRefreshNotificationCmd  = finishRefreshNotificationCmd
 	GuessAppIcon                  = guessAppIcon
+	RebootRequiredNotificationCmd = rebootRequiredNotificationCmd
 )
 
 func MockUcred(ucred *syscall.Ucred, err error) (restore func()) {
