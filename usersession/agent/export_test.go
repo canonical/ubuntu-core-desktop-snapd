@@ -33,6 +33,7 @@ var (
 	FinishRefreshNotificationCmd       = finishRefreshNotificationCmd
 	GuessAppData                       = guessAppData
 	GetLocalizedAppNameFromDesktopFile = getLocalizedAppNameFromDesktopFile
+	RebootRequiredNotificationCmd      = rebootRequiredNotificationCmd
 )
 
 func MockUcred(ucred *syscall.Ucred, err error) (restore func()) {
