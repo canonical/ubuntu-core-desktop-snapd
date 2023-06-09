@@ -365,7 +365,7 @@ func FinishTaskWithRestart(task *state.Task, status state.Status, rt RestartType
 	// instead or just log the request if we are on the undo path
 	switch rt {
 	case RestartSystem, RestartSystemNow:
-		if release.OnClassic {
+		if release.OnClassic || release.OnCoreDesktop {
 			if status == state.DoneStatus {
 				rm := restartManager(task.State(), "internal error: cannot request a restart before RestartManager initialization")
 				// notify the system that a reboot is required
