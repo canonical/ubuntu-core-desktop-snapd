@@ -39,7 +39,7 @@ def check_pr_title(pr_number: int):
     # radically
     parser = GithubTitleParser()
     with urllib.request.urlopen(
-        "https://github.com/snapcore/snapd/pull/{}".format(pr_number)
+        "https://github.com/canonical/ubuntu-core-desktop-snapd/pull/{}".format(pr_number)
     ) as f:
         parser.feed(f.read().decode("utf-8"))
     # the title has the format:
