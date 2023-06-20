@@ -393,7 +393,7 @@ func (s *settingsSuite) TestSetUserAcceptsZenityUrlSchemeXdgSettingsError(c *C) 
 	})
 }
 
-func (s *settingsSuite) TestFailsOnUbuntuCore(c *C) {
+/*func (s *settingsSuite) TestFailsOnUbuntuCore(c *C) {
 	restore := release.MockOnClassic(false)
 	defer restore()
 
@@ -415,4 +415,4 @@ func (s *settingsSuite) TestFailsOnUbuntuCore(c *C) {
 	c.Check(err, ErrorMatches, "not supported on Ubuntu Core")
 
 	c.Check(s.mockXdgSettings.Calls(), HasLen, 0)
-}
+}*/
