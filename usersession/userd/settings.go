@@ -235,12 +235,16 @@ func checkOutput(cmd *exec.Cmd, command string, setspec *settingSpec) (string, *
 // Example usage: dbus-send --session --dest=io.snapcraft.Settings --type=method_call --print-reply /io/snapcraft/Settings io.snapcraft.Settings.Check string:'default-web-browser' string:'firefox.desktop'
 func (s *Settings) Check(setting string, check string, sender dbus.Sender) (string, *dbus.Error) {
 	if err := checkOnClassic(); err != nil {
-		return "", err
+		// FIX ON ALL: only return if we are on pure classic, not if we are on Classic Desktop
+		//return "", err
 	}
 
 	settingMain := &settingSpec{setting: setting}
 	desktopFile, err := desktopFileFromValueForSetting(s, "check", settingMain, check, sender)
 	if err != nil {
+		if err2 := checkOnClassic(); err2 != nil {
+			return "", err2
+		}
 		return "", err
 	}
 
@@ -259,12 +263,16 @@ func (s *Settings) Check(setting string, check string, sender dbus.Sender) (stri
 // Example usage: dbus-send --session --dest=io.snapcraft.Settings --type=method_call --print-reply /io/snapcraft/Settings io.snapcraft.Settings.CheckSub string:'default-url-scheme-handler' string:'irc' string:'ircclient.desktop'
 func (s *Settings) CheckSub(setting string, subproperty string, check string, sender dbus.Sender) (string, *dbus.Error) {
 	if err := checkOnClassic(); err != nil {
-		return "", err
+		// FIX ON ALL: only return if we are on pure classic, not if we are on Classic Desktop
+		//return "", err
 	}
 
 	settingSub := &settingSpec{setting: setting, subproperty: subproperty}
 	desktopFile, err := desktopFileFromValueForSetting(s, "check", settingSub, check, sender)
 	if err != nil {
+		if err2 := checkOnClassic(); err2 != nil {
+			return "", err2
+		}
 		return "", err
 	}
 
@@ -283,11 +291,15 @@ func (s *Settings) CheckSub(setting string, subproperty string, check string, se
 // Example usage: dbus-send --session --dest=io.snapcraft.Settings --type=method_call --print-reply /io/snapcraft/Settings io.snapcraft.Settings.Get string:'default-web-browser'
 func (s *Settings) Get(setting string, sender dbus.Sender) (string, *dbus.Error) {
 	if err := checkOnClassic(); err != nil {
-		return "", err
+		// FIX ON ALL: only return if we are on pure classic, not if we are on Classic Desktop
+		//return "", err
 	}
 
 	settingMain := &settingSpec{setting: setting}
 	if err := settingMain.validate(); err != nil {
+		if err2 := checkOnClassic(); err2 != nil {
+			return "", err2
+		}
 		return "", err
 	}
 
@@ -306,11 +318,15 @@ func (s *Settings) Get(setting string, sender dbus.Sender) (string, *dbus.Error)
 // Example usage: dbus-send --session --dest=io.snapcraft.Settings --type=method_call --print-reply /io/snapcraft/Settings io.snapcraft.Settings.GetSub string:'default-url-scheme-handler' string:'irc'
 func (s *Settings) GetSub(setting string, subproperty string, sender dbus.Sender) (string, *dbus.Error) {
 	if err := checkOnClassic(); err != nil {
-		return "", err
+		// FIX ON ALL: only return if we are on pure classic, not if we are on Classic Desktop
+		//return "", err
 	}
 
 	settingSub := &settingSpec{setting: setting, subproperty: subproperty}
 	if err := settingSub.validate(); err != nil {
+		if err2 := checkOnClassic(); err2 != nil {
+			return "", err2
+		}
 		return "", err
 	}
 
@@ -329,12 +345,16 @@ func (s *Settings) GetSub(setting string, subproperty string, sender dbus.Sender
 // Example usage: dbus-send --session --dest=io.snapcraft.Settings --type=method_call --print-reply /io/snapcraft/Settings io.snapcraft.Settings.Set string:'default-web-browser' string:'chromium-browser.desktop'
 func (s *Settings) Set(setting string, new string, sender dbus.Sender) *dbus.Error {
 	if err := checkOnClassic(); err != nil {
-		return err
+		// FIX ON ALL: only return if we are on pure classic, not if we are on Classic Desktop
+		//return err
 	}
 
 	settingMain := &settingSpec{setting: setting}
 	desktopFile, err := desktopFileFromValueForSetting(s, "set", settingMain, new, sender)
 	if err != nil {
+		if err2 := checkOnClassic(); err2 != nil {
+			return err2
+		}
 		return err
 	}
 
@@ -356,12 +376,16 @@ func (s *Settings) Set(setting string, new string, sender dbus.Sender) *dbus.Err
 // Example usage: dbus-send --session --dest=io.snapcraft.Settings --type=method_call --print-reply /io/snapcraft/Settings io.snapcraft.Settings.SetSub string:'default-url-scheme-handler' string:'irc' string:'ircclient.desktop'
 func (s *Settings) SetSub(setting string, subproperty string, new string, sender dbus.Sender) *dbus.Error {
 	if err := checkOnClassic(); err != nil {
-		return err
+		// FIX ON ALL: only return if we are on pure classic, not if we are on Classic Desktop
+		//return err
 	}
 
 	settingSub := &settingSpec{setting: setting, subproperty: subproperty}
 	desktopFile, err := desktopFileFromValueForSetting(s, "set", settingSub, new, sender)
 	if err != nil {
+		if err2 := checkOnClassic(); err2 != nil {
+			return err2
+		}
 		return err
 	}
 
