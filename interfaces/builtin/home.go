@@ -41,6 +41,8 @@ const homeBaseDeclarationSlots = `
       -
         on-classic: false
       -
+        on-core-desktop: false
+      -
         plug-attributes:
           read: all
 `
