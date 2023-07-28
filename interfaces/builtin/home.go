@@ -39,8 +39,6 @@ const homeBaseDeclarationSlots = `
         read: all
     deny-auto-connection:
       -
-        on-classic: false
-      -
         on-core-desktop: false
       -
         plug-attributes:
