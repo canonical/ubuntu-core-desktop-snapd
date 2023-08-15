@@ -46,3 +46,5 @@ func MockRegularFileExists(f func(string) (bool, bool, error)) func() {
 		regularFileExists = old
 	}
 }
+
+var ArgumentsSecurityCheck = argumentsSecurityCheck

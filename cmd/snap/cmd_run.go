@@ -234,7 +234,7 @@ func (x *cmdRun) Execute(args []string) error {
 			return fmt.Errorf(i18n.G("unable to access privileged desktop launcher: unable unable to get session bus: %v"), err)
 		}
 		o := conn.Object("io.snapcraft.Launcher", "/io/snapcraft/PrivilegedDesktopLauncher")
-		call := o.Call("io.snapcraft.PrivilegedDesktopLauncher.OpenDesktopEntry", 0, desktopFile)
+		call := o.Call("io.snapcraft.PrivilegedDesktopLauncher.OpenDesktopEntry2", 0, desktopFile, "", args, make(map[string]string))
 		if call.Err != nil {
 			return fmt.Errorf(i18n.G("failed to launch %s via the privileged desktop launcher: %v"), desktopFile, call.Err)
 		}
