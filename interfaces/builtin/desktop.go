@@ -351,6 +351,29 @@ dbus (send)
     interface=io.snapcraft.Settings
     member={Check,CheckSub,Get,GetSub,Set,SetSub}
     peer=(label=unconfined),
+
+# Able to provide notifications
+dbus (receive)
+    bus=session
+    path=/org/freedesktop/Notifications
+    interface=org.freedesktop.Notifications
+    member="{GetCapabilities,GetServerInformation,Notify,CloseNotification}"
+    peer=(label=unconfined),
+
+dbus (send)
+    bus=session
+    path=/org/freedesktop/Notifications
+    interface=org.freedesktop.Notifications
+    member={ActionInvoked,NotificationClosed,NotificationReplied}
+    peer=(label=unconfined),
+
+# Able to provide GTK notifications
+dbus (receive)
+    bus=session
+    path=/org/gtk/Notifications
+    interface=org.gtk.Notifications
+    member="{AddNotification,RemoveNotification}"
+    peer=(label=unconfined),
 `
 
 type desktopInterface struct {
