@@ -149,6 +149,7 @@ func (s *AudioPlaybackInterfaceSuite) TestSecCompOnClassic(c *C) {
 	spec = &seccomp.Specification{}
 	c.Assert(spec.AddPermanentSlot(s.iface, s.classicSlotInfo), IsNil)
 	c.Assert(spec.SecurityTags(), HasLen, 0)
+
 	c.Assert(spec.SnippetForTag("snap.audio-playback.app1"), Not(testutil.Contains), "owner /run/user/[0-9]*/pipewire-[0-9] rwk,\n")
 	c.Check(spec.SnippetForTag("snap.audio-playback.app1"), Not(testutil.Contains), "/etc/pulse/ r,\n")
 	c.Check(spec.SnippetForTag("snap.audio-playback.app1"), Not(testutil.Contains), "/etc/pulse/** r,\n")
@@ -214,7 +215,7 @@ KERNEL=="controlC[0-9]*", TAG+="snap_audio-playback_app1"`)
 KERNEL=="pcmC[0-9]*D[0-9]*[cp]", TAG+="snap_audio-playback_app1"`)
 	c.Assert(spec.Snippets(), testutil.Contains, `# audio-playback
 KERNEL=="timer", TAG+="snap_audio-playback_app1"`)
-	c.Assert(spec.Snippets(), testutil.Contains, fmt.Sprintf(`TAG=="snap_audio-playback_app1", RUN+="%v/snap-device-helper $env{ACTION} snap_audio-playback_app1 $devpath $major:$minor"`, dirs.DistroLibExecDir))
+	c.Assert(spec.Snippets(), testutil.Contains, fmt.Sprintf(`TAG=="snap_audio-playback_app1", SUBSYSTEM!="module", SUBSYSTEM!="subsystem", RUN+="%v/snap-device-helper $env{ACTION} snap_audio-playback_app1 $devpath $major:$minor"`, dirs.DistroLibExecDir))
 }
 
 func (s *AudioPlaybackInterfaceSuite) TestInterfaces(c *C) {

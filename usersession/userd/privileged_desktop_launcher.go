@@ -20,7 +20,6 @@
 package userd
 
 import (
-	"bufio"
 	"fmt"
 	"net/url"
 	"os"
@@ -31,9 +30,9 @@ import (
 
 	"github.com/godbus/dbus"
 
+	"github.com/snapcore/snapd/desktop/desktopentry"
 	"github.com/snapcore/snapd/dirs"
 	"github.com/snapcore/snapd/osutil"
-	"github.com/snapcore/snapd/strutil/shlex"
 	"github.com/snapcore/snapd/systemd"
 )
 
@@ -52,7 +51,7 @@ const privilegedLauncherIntrospectionXML = `
 	<method name='OpenDesktopEntry2'>
 		<arg type='s' name='desktop_file_id' direction='in'/>
 		<arg type='s' name='action' direction='in'/>
-		<arg type='as' name='arguments' direction='in' />
+		<arg type='as' name='uris' direction='in' />
 		<arg type='a{ss}' name='environment' direction='in' />
 	</method>
 </interface>`
@@ -96,51 +95,55 @@ func (s *PrivilegedDesktopLauncher) OpenDesktopEntry2(desktopFileID string, acti
 		return dbus.MakeFailedError(err)
 	}
 
-	if err := argumentsSecurityCheck(uris); err != nil {
+	if err := validateURIs(uris); err != nil {
 		return dbus.MakeFailedError(err)
 	}
 
-	if len(environment) != 0 {
-		return dbus.MakeFailedError(fmt.Errorf("unknown variables in environment"))
-	}
-
-	command, icon, err := readExecCommandFromDesktopFile(desktopFile, action)
+	de, err := desktopentry.Read(desktopFile)
 	if err != nil {
 		return dbus.MakeFailedError(err)
 	}
 
-	args, err := parseExecCommand(command, icon, uris)
+	var execArgs []string
+	if action == "" {
+		execArgs, err = de.ExpandExec(uris)
+	} else {
+		execArgs, err = de.ExpandActionExec(action, uris)
+	}
 	if err != nil {
 		return dbus.MakeFailedError(err)
 	}
 
-	err = systemd.EnsureAtLeast(236)
-	if err == nil {
+	args := []string{"--user"}
+	if err = systemd.EnsureAtLeast(236); err == nil {
 		// systemd 236 introduced the --collect option to systemd-run,
 		// which specifies that the unit should be garbage collected
 		// even if it fails.
 		//   https://github.com/systemd/systemd/pull/7314
-		args = append([]string{"systemd-run", "--user", "--collect", "--"}, args...)
-	} else if systemd.IsSystemdTooOld(err) {
-		args = append([]string{"systemd-run", "--user", "--"}, args...)
-	} else {
+		args = append(args, "--collect")
+	} else if !systemd.IsSystemdTooOld(err) {
 		// systemd not available
 		return dbus.MakeFailedError(err)
 	}
+	if args, err = appendEnvironment(args, environment); err != nil {
+		return dbus.MakeFailedError(err)
+	}
+	args = append(args, "--")
+	args = append(args, execArgs...)
 
-	cmd := exec.Command(args[0], args[1:]...)
+	cmd := exec.Command("systemd-run", args...)
 
 	if err := cmd.Run(); err != nil {
-		return dbus.MakeFailedError(fmt.Errorf("cannot run %q: %v", command, err))
+		return dbus.MakeFailedError(fmt.Errorf("cannot run %q: %v", args, err))
 	}
 
 	return nil
 }
 
-// argumentsSecurityCheck ensures that all of the arguments passed
-// by are URIs, to avoid security problems.
-func argumentsSecurityCheck(arguments []string) error {
-	for _, arg := range arguments {
+// validateURIs ensures that all of the uris passed are absolute URIs,
+// and if they are file URIs that their path component is absolute.
+func validateURIs(uris []string) error {
+	for _, arg := range uris {
 		if arg == "" {
 			return fmt.Errorf("passed an empty parameter")
 		}
@@ -161,6 +164,22 @@ func argumentsSecurityCheck(arguments []string) error {
 		}
 	}
 	return nil
+}
+
+// appendEnvironment extends a systemd-run command line to set allowed
+// environment variables.
+func appendEnvironment(args []string, environment map[string]string) ([]string, error) {
+	for key, value := range environment {
+		switch key {
+		case "DESKTOP_STARTUP_ID", "XDG_ACTIVATION_TOKEN":
+			// Allow startup notification related
+			// environment variables
+			args = append(args, fmt.Sprintf("--setenv=%s=%s", key, value))
+		default:
+			return nil, fmt.Errorf("unknown variables in environment")
+		}
+	}
+	return args, nil
 }
 
 var regularFileExists = osutil.RegularFileExists
@@ -271,111 +290,4 @@ func verifyDesktopFileLocation(desktopFile string) error {
 	}
 
 	return nil
-}
-
-// readExecCommandFromDesktopFile parses the desktop file to get the Exec entry and
-// checks that the BAMF_DESKTOP_FILE_HINT is present and refers to the desktop file.
-func readExecCommandFromDesktopFile(desktopFile string, action string) (exec string, icon string, err error) {
-	file, err := os.Open(desktopFile)
-	if err != nil {
-		return exec, icon, err
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-
-	var inDesktopSection, seenDesktopSection bool
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if line == "[Desktop Entry]" {
-			if action == "" {
-				if seenDesktopSection {
-					return "", "", fmt.Errorf("desktop file %q has multiple [Desktop Entry] sections", desktopFile)
-				}
-				seenDesktopSection = true
-				inDesktopSection = true
-			} else {
-				inDesktopSection = false
-			}
-		} else if strings.HasPrefix(line, "[Desktop Action ") {
-			pos := strings.Index(line, "]")
-			if pos != -1 && strings.TrimSpace(line[16:pos]) == action {
-				seenDesktopSection = true
-				inDesktopSection = true
-			} else {
-				inDesktopSection = false
-			}
-		} else if strings.HasPrefix(line, "[") {
-			inDesktopSection = false
-		} else if inDesktopSection {
-			if strings.HasPrefix(line, "Exec=") {
-				exec = strings.TrimPrefix(line, "Exec=")
-			} else if strings.HasPrefix(line, "Icon=") {
-				icon = strings.TrimPrefix(line, "Icon=")
-			}
-		}
-	}
-
-	expectedPrefix := fmt.Sprintf("env BAMF_DESKTOP_FILE_HINT=%s %s", desktopFile, dirs.SnapBinariesDir)
-	if !strings.HasPrefix(exec, expectedPrefix) {
-		return "", "", fmt.Errorf("desktop file %q has an unsupported 'Exec' value: %q", desktopFile, exec)
-	}
-
-	return exec, icon, nil
-}
-
-// Parse the Exec command by stripping any exec variables.
-// Passing exec variables (eg, %foo) between confined snaps is unsupported. Currently,
-// we do not have support for passing them in the D-Bus API but there are security
-// implications that must be thought through regarding the influence of the launching
-// snap over the launcher wrt exec variables. For now we simply filter them out.
-// https://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html#exec-variables
-func parseExecCommand(command string, icon string, uris []string) ([]string, error) {
-	origArgs, err := shlex.Split(command)
-	if err != nil {
-		return nil, err
-	}
-
-	args := make([]string, 0, len(origArgs))
-	for _, arg := range origArgs {
-		// We want to keep literal '%' (expressed as '%%') but filter our exec variables
-		// like '%foo'
-		if strings.HasPrefix(arg, "%%") {
-			arg = arg[1:]
-		} else if strings.HasPrefix(arg, "%") {
-			switch arg {
-			case "%u":
-				if (uris != nil) && (len(uris) > 0) {
-					args = append(args, uris[0])
-				}
-			case "%U":
-				args = append(args, uris...)
-			case "%f":
-				if (uris != nil) && (len(uris) > 0) {
-					uri, _ := url.Parse(uris[0])
-					if uri.Scheme != "file" {
-						return nil, fmt.Errorf("cannot run %q because it expects a file, but a non-file URI (%q) was passed", command, uris[0])
-					}
-					args = append(args, uri.Path)
-				}
-			case "%F":
-				if (uris != nil) && (len(uris) > 0) {
-					for _, uri := range uris {
-						uri_parsed, _ := url.Parse(uris[0])
-						if uri_parsed.Scheme != "file" {
-							return nil, fmt.Errorf("cannot run %q because it expects files, but a non-file URI (%q) was passed", command, uri)
-						}
-						args = append(args, uri_parsed.Path)
-					}
-				}
-			case "%i":
-				args = append(args, "--icon", icon)
-			default:
-				return nil, fmt.Errorf("cannot run %q due to use of %q", command, arg)
-			}
-			continue
-		}
-		args = append(args, arg)
-	}
-	return args, nil
 }

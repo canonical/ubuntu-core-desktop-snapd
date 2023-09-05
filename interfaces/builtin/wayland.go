@@ -26,6 +26,7 @@ import (
 	"github.com/snapcore/snapd/interfaces/apparmor"
 	"github.com/snapcore/snapd/interfaces/seccomp"
 	"github.com/snapcore/snapd/interfaces/udev"
+	"github.com/snapcore/snapd/release"
 	"github.com/snapcore/snapd/snap"
 )
 
@@ -105,6 +106,11 @@ owner /run/user/[0-9]*/###PLUG_SECURITY_TAGS###/{mesa,mutter,sdl,wayland-cursor,
 owner /{dev,run}/shm/###PLUG_SECURITY_TAGS###.wayland.mozilla.ipc.[0-9]* rw,
 `
 
+const waylandConnectedSlotEglstreamAppArmor = `
+# Wayland on eglstream (Nvidia) communicates using an anonymous socket
+unix (send, receive) type=stream peer=(label=###PLUG_SECURITY_TAGS###),
+`
+
 const waylandConnectedPlugAppArmor = `
 # Allow access to the Wayland compositor server socket
 owner /run/user/[0-9]*/wayland-[0-9]* rw,
@@ -116,6 +122,10 @@ owner /run/user/[0-9]*/wayland-[0-9]* rw,
 const waylandConnectedPlugAppArmorCore = `
 # Allow access to the Wayland compositor server socket of the slot snap
 owner /run/user/[0-9]*/###SLOT_SECURITY_TAGS###/wayland-[0-9]* rw,
+`
+const waylandConnectedPlugEglstreamAppArmor = `
+# Wayland on eglstream (Nvidia) communicates using an anonymous socket
+unix (send, receive) type=stream peer=(label=###SLOT_SECURITY_TAGS###),
 `
 
 type waylandInterface struct{}
@@ -140,6 +150,12 @@ func (iface *waylandInterface) AppArmorConnectedPlug(spec *apparmor.Specificatio
 		snippet := strings.Replace(waylandConnectedPlugAppArmorCore, old, new, -1)
 		spec.AddSnippet(snippet)
 	}
+	if !release.OnClassic {
+		old := "###SLOT_SECURITY_TAGS###"
+		new := slotAppLabelExpr(slot)
+		snippet := strings.Replace(waylandConnectedPlugEglstreamAppArmor, old, new, -1)
+		spec.AddSnippet(snippet)
+	}
 	return nil
 }
 
@@ -147,6 +163,11 @@ func (iface *waylandInterface) AppArmorConnectedSlot(spec *apparmor.Specificatio
 	old := "###PLUG_SECURITY_TAGS###"
 	new := "snap." + plug.Snap().InstanceName() // forms the snap-instance-specific subdirectory name of /run/user/*/ used for XDG_RUNTIME_DIR
 	snippet := strings.Replace(waylandConnectedSlotAppArmor, old, new, -1)
+	spec.AddSnippet(snippet)
+
+	old = "###PLUG_SECURITY_TAGS###"
+	new = plugAppLabelExpr(plug)
+	snippet = strings.Replace(waylandConnectedSlotEglstreamAppArmor, old, new, -1)
 	spec.AddSnippet(snippet)
 	return nil
 }

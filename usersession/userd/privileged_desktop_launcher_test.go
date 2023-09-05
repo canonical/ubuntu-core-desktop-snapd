@@ -23,6 +23,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	. "gopkg.in/check.v1"
@@ -125,7 +126,7 @@ func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntryFailsWithBadExecuta
 	defer cmd.Restore()
 
 	err := s.launcher.OpenDesktopEntry("mircade_mircade.desktop", ":some-dbus-sender")
-	c.Check(err, ErrorMatches, `cannot run ".*": exit status 1`)
+	c.Check(err, ErrorMatches, `cannot run \[.*\]: exit status 1`)
 }
 
 func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntryFailsForNonSnap(c *C) {
@@ -144,12 +145,20 @@ func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2SucceedsWithURIs(c
 	c.Check(err, IsNil)
 }
 
+func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2WithEnv(c *C) {
+	cmd := testutil.MockCommand(c, "systemd-run", "true")
+	defer cmd.Restore()
+
+	err := s.launcher.OpenDesktopEntry2("mircade_mircade.desktop", "", []string{"file:///test.txt"}, map[string]string{"XDG_ACTIVATION_TOKEN": "wayland-id"}, ":some-dbus-sender")
+	c.Check(err, IsNil)
+}
+
 func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2FailsWithUnexpectedURI(c *C) {
 	cmd := testutil.MockCommand(c, "systemd-run", "true")
 	defer cmd.Restore()
 
 	err := s.launcher.OpenDesktopEntry2("mircade_mircade.desktop", "", []string{"http://example.org"}, nil, ":some-dbus-sender")
-	c.Check(err, ErrorMatches, `cannot run .* because it expects a file, but a non-file URI \("http://example.org"\) was passed`)
+	c.Check(err, ErrorMatches, `"http://example.org" is not a file URI`)
 }
 
 func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2FailsWithEnvironmentVars(c *C) {
@@ -160,13 +169,39 @@ func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2FailsWithEnvironme
 	c.Check(err, ErrorMatches, `unknown variables in environment`)
 }
 
-func (s *privilegedDesktopLauncherSuite) TestArgumentsSecurity(c *C) {
-	err := userd.ArgumentsSecurityCheck([]string{"http://param1.com", "file:///param2.txt", "mailto:user@example.org"})
+func (s *privilegedDesktopLauncherSuite) TestAppendEnvironment(c *C) {
+	// If no environment variables are passed, args is passed
+	// through unchanged.
+	args, err := userd.AppendEnvironment([]string{"foo"}, nil)
 	c.Check(err, IsNil)
-	err = userd.ArgumentsSecurityCheck([]string{"-param2"})
+	c.Check(args, DeepEquals, []string{"foo"})
+
+	// Startup notification environment variables are passed through
+	args, err = userd.AppendEnvironment([]string{"foo"}, map[string]string{
+		"DESKTOP_STARTUP_ID":   "x11-id",
+		"XDG_ACTIVATION_TOKEN": "wayland-id",
+	})
+	c.Check(err, IsNil)
+	// Sort the extra arguments in the slice, to remove dependence
+	// on map iteration order.
+	sort.Strings(args[1:])
+	c.Check(args, DeepEquals, []string{"foo", "--setenv=DESKTOP_STARTUP_ID=x11-id", "--setenv=XDG_ACTIVATION_TOKEN=wayland-id"})
+
+	// Error out on unexpected variables
+	args, err = userd.AppendEnvironment([]string{"foo"}, map[string]string{
+		"WAYLAND_DISPLAY": "wayland-0",
+	})
+	c.Check(args, IsNil)
+	c.Check(err, ErrorMatches, `unknown variables in environment`)
+}
+
+func (s *privilegedDesktopLauncherSuite) TestValidateURIs(c *C) {
+	err := userd.ValidateURIs([]string{"http://param1.com", "file:///param2.txt", "mailto:user@example.org"})
+	c.Check(err, IsNil)
+	err = userd.ValidateURIs([]string{"-param2"})
 	c.Check(err, ErrorMatches, `passed a non-absolute URI: -param2`)
-	err = userd.ArgumentsSecurityCheck([]string{"file://a/test.txt"})
+	err = userd.ValidateURIs([]string{"file://a/test.txt"})
 	c.Check(err, ErrorMatches, `passed a file URI with a non-empty host: file://a/test.txt`)
-	err = userd.ArgumentsSecurityCheck([]string{"file:test.txt"})
+	err = userd.ValidateURIs([]string{"file:test.txt"})
 	c.Check(err, ErrorMatches, `passed a file URI with a relative path: file:test.txt`)
 }
