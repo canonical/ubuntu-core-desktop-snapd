@@ -78,6 +78,16 @@ func (s *DesktopLaunchSuite) SetUpTest(c *C) {
 		os.Setenv("BAMF_DESKTOP_FILE_HINT", bamfDesktopFileHint)
 	})
 	os.Unsetenv("BAMF_DESKTOP_FILE_HINT")
+	desktopStartupID := os.Getenv("DESKTOP_STARTUP_ID")
+	s.AddCleanup(func() {
+		os.Setenv("DESKTOP_STARTUP_ID", desktopStartupID)
+	})
+	os.Unsetenv("DESKTOP_STARTUP_ID")
+	xdgActivationToken := os.Getenv("XDG_ACTIVATION_TOKEN")
+	s.AddCleanup(func() {
+		os.Setenv("XDG_ACTIVATION_TOKEN", xdgActivationToken)
+	})
+	os.Unsetenv("XDG_ACTIVATION_TOKEN")
 }
 
 func (s *DesktopLaunchSuite) TestLaunch(c *C) {
@@ -166,12 +176,18 @@ func (s *DesktopLaunchSuite) TestDBusLaunch(c *C) {
 			dbus.FieldDestination: dbus.MakeVariant("io.snapcraft.Launcher"),
 			dbus.FieldPath:        dbus.MakeVariant(dbus.ObjectPath("/io/snapcraft/PrivilegedDesktopLauncher")),
 			dbus.FieldInterface:   dbus.MakeVariant("io.snapcraft.PrivilegedDesktopLauncher"),
-			dbus.FieldMember:      dbus.MakeVariant("OpenDesktopEntry"),
-			dbus.FieldSignature:   dbus.MakeVariant(dbus.ParseSignatureMust("s")),
+			dbus.FieldMember:      dbus.MakeVariant("OpenDesktopEntry2"),
+			dbus.FieldSignature:   dbus.MakeVariant(dbus.ParseSignatureMust("ssasa{ss}")),
 		})
 
-		c.Assert(msg.Body, HasLen, 1)
+		c.Assert(msg.Body, HasLen, 4)
 		c.Check(msg.Body[0], Equals, "foo_foo.desktop")
+		c.Check(msg.Body[1], Equals, "action1")
+		c.Check(msg.Body[2], DeepEquals, []string{"file:///test.txt"})
+		c.Check(msg.Body[3], DeepEquals, map[string]string{
+			"DESKTOP_STARTUP_ID":   "x11-startup-id",
+			"XDG_ACTIVATION_TOKEN": "wayland-startup-id",
+		})
 
 		reply := &dbus.Message{
 			Type: dbus.TypeMethodReply,
@@ -193,6 +209,8 @@ func (s *DesktopLaunchSuite) TestDBusLaunch(c *C) {
 	defer restore()
 
 	os.Setenv("SNAP", "launcher-snap")
+	os.Setenv("DESKTOP_STARTUP_ID", "x11-startup-id")
+	os.Setenv("XDG_ACTIVATION_TOKEN", "wayland-startup-id")
 
 	_, err = snap.Parser(snap.Client()).ParseArgs([]string{"routine", "desktop-launch", "--desktop", s.desktopFile, "--action", "action1", "--", "/test.txt"})
 	c.Check(err, IsNil)
