@@ -4,7 +4,7 @@ details: |
     The desktop-launch interface allows a snap to launch other snaps via
     the desktop files they provide to the host system.
 
-systems: [-ubuntu-core-*]
+systems: [-ubuntu-core-1*, -ubuntu-*-32]
 
 skip:
     - reason: This test needs systemd and dbus sessions to run
@@ -41,7 +41,7 @@ execute: |
     snap connections test-launcher | MATCH "desktop-launch +test-launcher:desktop-launch +:desktop-launch +manual"
 
     echo "The launcher snap can launch other snaps via userd"
-    tests.session -u test exec test-launcher \
+    tests.session -u test exec test-launcher.dbus \
         test-app_test-app.desktop
 
     echo "The app snap records that it has been launched"
@@ -67,3 +67,19 @@ execute: |
 
     echo "Check that snap can access /v2/snaps"
     api-client --socket /run/snapd-snap.socket "/v2/snaps" | gojq '."status-code"' | MATCH '^200$'
+
+    if ! os.query is-core; then
+        exit 0
+    fi
+    echo "The launcher snap can also invoke the snap via the desktop file Exec line"
+    rm "$launch_data"
+    tests.session -u test exec test-launcher.exec \
+        test-app_test-app.desktop
+    retry -n 5 --wait 1 test -s "$launch_data"
+    MATCH "^args=arg-before arg-after$" < "$launch_data"
+
+    echo "The desktop-launch helper reports errors from the D-Bus service"
+    not tests.session -u test exec test-launcher.cmd \
+        snap routine desktop-launch --desktop \
+            /var/lib/snapd/desktop/applications/no-such.desktop 2> stderr.log
+    MATCH 'failed to launch no-such.desktop via the privileged desktop launcher:' < stderr.log
