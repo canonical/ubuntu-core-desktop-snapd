@@ -78,6 +78,19 @@ func cmdlineArgsToUris(args []string) ([]string, error) {
 	return uris, nil
 }
 
+func collectLaunchEnv() map[string]string {
+	env := map[string]string{}
+	for _, key := range []string{
+		"DESKTOP_STARTUP_ID",
+		"XDG_ACTIVATION_TOKEN",
+	} {
+		if val := os.Getenv(key); val != "" {
+			env[key] = val
+		}
+	}
+	return env
+}
+
 func (x *cmdDesktopLaunch) Execute([]string) error {
 	if filepath.Clean(x.DesktopFile) != x.DesktopFile {
 		return fmt.Errorf("desktop file has unclean path: %q", x.DesktopFile)
@@ -86,11 +99,17 @@ func (x *cmdDesktopLaunch) Execute([]string) error {
 		return fmt.Errorf("only launching snap applications from %s is supported", dirs.SnapDesktopFilesDir)
 	}
 
+	uris, err := cmdlineArgsToUris(x.Positional.FilesOrUris)
+	if err != nil {
+		return err
+	}
+
 	// If running a desktop file from a confined snap process,
 	// then run via the privileged launcher.
 	if os.Getenv("SNAP") != "" {
 		// Only the application file name is required for launching.
 		desktopFile := filepath.Base(x.DesktopFile)
+		env := collectLaunchEnv()
 
 		// Attempt to launch the desktop file via the
 		// privileged launcher, this will check that this snap
@@ -100,7 +119,7 @@ func (x *cmdDesktopLaunch) Execute([]string) error {
 			return fmt.Errorf(i18n.G("unable to access privileged desktop launcher: unable to get session bus: %v"), err)
 		}
 		o := conn.Object("io.snapcraft.Launcher", "/io/snapcraft/PrivilegedDesktopLauncher")
-		call := o.Call("io.snapcraft.PrivilegedDesktopLauncher.OpenDesktopEntry", 0, desktopFile)
+		call := o.Call("io.snapcraft.PrivilegedDesktopLauncher.OpenDesktopEntry2", 0, desktopFile, x.Action, uris, env)
 		if call.Err != nil {
 			return fmt.Errorf(i18n.G("failed to launch %s via the privileged desktop launcher: %v"), desktopFile, call.Err)
 		}
@@ -108,11 +127,6 @@ func (x *cmdDesktopLaunch) Execute([]string) error {
 	}
 
 	de, err := desktopentry.Read(x.DesktopFile)
-	if err != nil {
-		return err
-	}
-
-	uris, err := cmdlineArgsToUris(x.Positional.FilesOrUris)
 	if err != nil {
 		return err
 	}
