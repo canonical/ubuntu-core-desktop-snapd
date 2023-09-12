@@ -104,12 +104,35 @@ var isValidDesktopFileLine = regexp.MustCompile(strings.Join([]string{
 	"^TargetEnvironment=",
 }, "|")).Match
 
+// fileOrUriMacro returns the Exec line macro used to expand files or URIs
+func fileOrUriMacro(cmd string) rune {
+	isMacro := false
+	for _, r := range cmd {
+		if isMacro {
+			switch r {
+			case 'f', 'F', 'u', 'U':
+				return r
+			}
+			isMacro = false
+		} else if r == '%' {
+			isMacro = true
+		}
+	}
+	// If no macros are found, default to accepting a single regular file
+	return 'f'
+}
+
 // detectAppAndRewriteExecLine parses snap app name from passed "Exec=" line and rewrites it
 // to use the wrapper path for snap application.
-func detectAppAndRewriteExecLine(s *snap.Info, desktopFile, line string) (appInfo *snap.AppInfo, execLine string, err error) {
+func detectAppAndRewriteExecLine(s *snap.Info, desktopFile, action, line string) (appInfo *snap.AppInfo, execLine string, err error) {
+	if action != "" {
+		action = " --action " + action
+	}
 	cmd := strings.SplitN(line, "=", 2)[1]
+	exec := fmt.Sprintf("Exec=/usr/bin/snap routine desktop-launch --desktop %s%s -- %%%c\nX-Snap-Exec=", desktopFile, action, fileOrUriMacro(cmd))
+
 	for _, app := range s.Apps {
-		wrapper := app.WrapperPath()
+		wrapper := filepath.Base(app.WrapperPath())
 		validCmd := filepath.Base(wrapper)
 		if s.InstanceKey != "" {
 			// wrapper uses s.InstanceName(), with the instance key
@@ -123,15 +146,13 @@ func detectAppAndRewriteExecLine(s *snap.Info, desktopFile, line string) (appInf
 		if cmd == validCmd {
 			if app.IsService() {
 				return app, "Exec=/usr/bin/false", nil
-			} else {
-				return app, "Exec=" + wrapper, nil
 			}
+			return app, exec + wrapper, nil
 		} else if strings.HasPrefix(cmd, validCmd+" ") {
 			if app.IsService() {
 				return app, "Exec=/usr/bin/false", nil
-			} else {
-				return app, fmt.Sprintf("Exec=%s%s", wrapper, line[len("Exec=")+len(validCmd):]), nil
 			}
+			return app, exec + wrapper + cmd[len(validCmd):], nil
 		}
 	}
 
@@ -143,7 +164,7 @@ func detectAppAndRewriteExecLine(s *snap.Info, desktopFile, line string) (appInf
 	desktopFileApp := strings.TrimSuffix(df, filepath.Ext(df))
 	app, ok := s.Apps[desktopFileApp]
 	if ok {
-		newExec := fmt.Sprintf("Exec=%s", app.WrapperPath())
+		newExec := exec + filepath.Base(app.WrapperPath())
 		if app.IsService() {
 			newExec = "Exec=/usr/bin/false"
 		}
@@ -187,6 +208,7 @@ func rewriteIconLine(s *snap.Info, line string) (string, error) {
 func sanitizeDesktopFile(s *snap.Info, desktopFile string, rawcontent []byte) []byte {
 	var newContent bytes.Buffer
 	scanner := bufio.NewScanner(bytes.NewReader(rawcontent))
+	action := ""
 	for i := 0; scanner.Scan(); i++ {
 		bline := scanner.Bytes()
 
@@ -194,11 +216,18 @@ func sanitizeDesktopFile(s *snap.Info, desktopFile string, rawcontent []byte) []
 			logger.Debugf("ignoring line %d (%q) in source of desktop file %q", i, bline, filepath.Base(desktopFile))
 			continue
 		}
+		// Record whether we are within a [Desktop Action $foo] group
+		if len(bline) > 0 && bline[0] == '[' {
+			action = ""
+		}
+		if bytes.HasPrefix(bline, []byte("[Desktop Action ")) {
+			action = string(bline[len("[Desktop Action ") : len(bline)-1])
+		}
 
 		// rewrite exec lines to an absolute path for the binary
 		if bytes.HasPrefix(bline, []byte("Exec=")) {
 			var err error
-			appInfo, line, err := detectAppAndRewriteExecLine(s, desktopFile, string(bline))
+			appInfo, line, err := detectAppAndRewriteExecLine(s, desktopFile, action, string(bline))
 			if err != nil {
 				// something went wrong, ignore the line
 				continue

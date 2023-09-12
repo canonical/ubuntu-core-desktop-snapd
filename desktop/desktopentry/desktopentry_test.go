@@ -46,6 +46,7 @@ Type=Application
 Name=Web Browser
 X-SnapAppName=browser-app
 Exec=browser %%u
+X-Snap-Exec=snap.browser %%u
 Icon = ${SNAP}/default256.png
 Actions=NewWindow;NewPrivateWindow;
 %[1]s
@@ -59,6 +60,7 @@ Exec=not-the-executable
 Name = Open a New Window
 X-SnapAppName=browser-app
 Exec=browser -new-window
+X-Snap-Exec=snap.browser -new-window
 
 [Desktop Action NewPrivateWindow]
 Name=Open a New Private Window
@@ -77,6 +79,7 @@ func (s *desktopentrySuite) TestParse(c *C) {
 	c.Check(de.Name, Equals, "Web Browser")
 	c.Check(de.Icon, Equals, "${SNAP}/default256.png")
 	c.Check(de.Exec, Equals, "browser %u")
+	c.Check(de.SnapExec, Equals, "snap.browser %u")
 	c.Check(de.SnapInstanceName, Equals, "browser")
 	c.Check(de.SnapAppName, Equals, "browser-app")
 	c.Check(de.SnapCommonID, Equals, "")
@@ -113,12 +116,14 @@ func (s *desktopentrySuite) TestParseWithCommonID(c *C) {
 	c.Check(de.Actions["NewWindow"].Name, Equals, "Open a New Window")
 	c.Check(de.Actions["NewWindow"].Icon, Equals, "")
 	c.Check(de.Actions["NewWindow"].Exec, Equals, "browser -new-window")
+	c.Check(de.Actions["NewWindow"].SnapExec, Equals, "snap.browser -new-window")
 	c.Check(de.Actions["NewWindow"].SnapAppName, Equals, "browser-app")
 
 	c.Assert(de.Actions["NewPrivateWindow"], NotNil)
 	c.Check(de.Actions["NewPrivateWindow"].Name, Equals, "Open a New Private Window")
 	c.Check(de.Actions["NewPrivateWindow"].Icon, Equals, "${SNAP}/private.png")
 	c.Check(de.Actions["NewPrivateWindow"].Exec, Equals, "browser -private-window")
+	c.Check(de.Actions["NewPrivateWindow"].SnapExec, Equals, "")
 	c.Check(de.Actions["NewPrivateWindow"].SnapAppName, Equals, "browser-app")
 }
 
@@ -304,6 +309,21 @@ func (s *desktopentrySuite) TestExpandExec(c *C) {
 	c.Check(err, ErrorMatches, `desktop file "/path/browser.desktop" has no Exec line`)
 }
 
+func (s *desktopentrySuite) TestExpandSnapExec(c *C) {
+	r := bytes.NewBufferString(browserDesktopEntry)
+	de, err := desktopentry.Parse("/path/browser.desktop", r)
+	c.Assert(err, IsNil)
+
+	args, err := de.ExpandSnapExec([]string{"http://example.org"})
+	c.Assert(err, IsNil)
+	c.Check(args, DeepEquals, []string{"snap.browser", "http://example.org"})
+
+	// If the X-Snap-Exec line is missing, an error is returned
+	de.SnapExec = ""
+	_, err = de.ExpandSnapExec(nil)
+	c.Check(err, ErrorMatches, `desktop file "/path/browser.desktop" has no X-Snap-Exec line`)
+}
+
 func (s *desktopentrySuite) TestExpandActionExec(c *C) {
 	r := bytes.NewBufferString(browserDesktopEntry)
 	de, err := desktopentry.Parse("/path/browser.desktop", r)
@@ -321,6 +341,24 @@ func (s *desktopentrySuite) TestExpandActionExec(c *C) {
 	de.Actions["NewWindow"].Exec = ""
 	_, err = de.ExpandActionExec("NewWindow", nil)
 	c.Check(err, ErrorMatches, `desktop file "/path/browser.desktop" action "NewWindow" has no Exec line`)
+}
+
+func (s *desktopentrySuite) TestExpandActionSnapExec(c *C) {
+	r := bytes.NewBufferString(browserDesktopEntry)
+	de, err := desktopentry.Parse("/path/browser.desktop", r)
+	c.Assert(err, IsNil)
+
+	args, err := de.ExpandActionSnapExec("NewWindow", nil)
+	c.Assert(err, IsNil)
+	c.Check(args, DeepEquals, []string{"snap.browser", "-new-window"})
+
+	// Expanding a non-existent action, an error is returned
+	_, err = de.ExpandActionSnapExec("UnknownAction", nil)
+	c.Check(err, ErrorMatches, `desktop file "/path/browser.desktop" does not have action "UnknownAction"`)
+
+	// If the action is missing its Exec line, an error is returned
+	_, err = de.ExpandActionSnapExec("NewPrivateWindow", nil)
+	c.Check(err, ErrorMatches, `desktop file "/path/browser.desktop" action "NewPrivateWindow" has no X-Snap-Exec line`)
 }
 
 const chromiumDesktopEntry = `[Desktop Entry]

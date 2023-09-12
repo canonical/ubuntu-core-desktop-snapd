@@ -54,7 +54,8 @@ execute: |
     	Name=Echo
     	Comment=It echos stuff
     	X-SnapAppName=echo
-    	Exec=$SNAP_MOUNT_DIR/bin/basic-desktop.echo
+    	Exec=/usr/bin/snap routine desktop-launch --desktop /var/lib/snapd/desktop/applications/basic-desktop_echo.desktop -- %f
+    	X-Snap-Exec=basic-desktop.echo
     EOF
 
     echo "Sideload devmode snap fails without flags"

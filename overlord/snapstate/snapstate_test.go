@@ -10898,8 +10898,9 @@ X-SnapInstanceName=test-snap`)
 X-SnapInstanceName=test-snap
 Name=test
 X-SnapAppName=test-snap
-Exec=%s/test-snap
-`[1:], dirs.SnapBinariesDir)
+Exec=/usr/bin/snap routine desktop-launch --desktop %s/test-snap_test-snap.desktop -- %%f
+X-Snap-Exec=test-snap
+`[1:], dirs.SnapDesktopFilesDir)
 
 	c.Assert(desktopFile, testutil.FileEquals, expectedContent)
 	c.Assert(otherDesktopFile, testutil.FileAbsent)
