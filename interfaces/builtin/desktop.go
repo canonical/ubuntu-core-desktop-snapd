@@ -370,6 +370,27 @@ dbus (receive)
     member="{AddNotification,RemoveNotification}"
     peer=(label=unconfined),
 
+# Allow registering session with GDM, necessary for screen locking
+dbus (send)
+    bus=system
+    path=/org/gnome/DisplayManager/Manager
+    interface=org.gnome.DisplayManager.Manager
+    member={RegisterSession,OpenReauthenticationChannel}
+    peer=(label=unconfined),
+dbus (send)
+    bus=system
+    path=/org/gnome/DisplayManager/Manager
+    interface=org.freedesktop.DBus.Properties
+    member="Get{,All}"
+    peer=(label=unconfined),
+
+# Allow access to GDM's private reauthentication channel socket
+# FIXME: this will break once we upgrade to glib 2.75.x, and GDM
+# starts creating a non-abstract socket in /tmp.
+unix (connect, receive, send)
+    type=stream
+    peer=(addr="@/tmp/dbus-*"),
+
 # Allow unconfined xdg-desktop-portal to communicate with impl
 # services provided by the snap.
 dbus (receive, send)
