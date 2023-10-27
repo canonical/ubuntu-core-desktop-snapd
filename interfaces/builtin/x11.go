@@ -74,6 +74,13 @@ unix (bind, listen, accept)
      type=stream
      addr="@/tmp/.ICE-unix/[0-9]*",
 
+# Allow all connections to the X11 socket
+# NOTE: This is a temporary work around until the kernel bug
+# preventing proper rule replacement on the socket is fixed.
+unix (connect, receive, send, accept)
+    type=stream
+    addr="@/tmp/.X11-unix/X[0-9]*",
+
 # On systems with Tegra drivers, X11 needs to create the socket for clients to
 # use.
 unix (bind, listen, accept)
