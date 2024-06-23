@@ -1,0 +1,21 @@
+name: Commit to keep branch open
+on:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  check-commits:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Make empty commit if no activity
+      run: |
+        commits=$(git log --since='20 days ago')
+        if [ -z "$commits" ]; then
+            git config user.name "GitHub Actions Bot"
+            git config user.email "<>"
+            git commit --allow-empty -m "No change commit to trigger snap rebuild"
+            git push
+        fi
