@@ -162,6 +162,7 @@ func (s *baseDeclSuite) TestAutoConnection(c *C) {
 		"remoteproc":               true,
 		"screen-inhibit-control":   true,
 		"snapd-control":            true,
+		"systemd-user-control":     true,
 		"upower-observe":           true,
 		"empty":                    true,
 	}
@@ -332,6 +333,25 @@ func (s *baseDeclSuite) TestAutoConnectionSnapdControl(c *C) {
 	plugsSlots := `
 plugs:
   snapd-control:
+    allow-auto-connection: true
+`
+
+	lxdDecl := s.mockSnapDecl(c, "some-snap", "J60k4JY0HppjwOjW8dZdYc8obXKxujRu", "canonical", plugsSlots)
+	cand.PlugSnapDeclaration = lxdDecl
+	arity, err := cand.CheckAutoConnect()
+	c.Check(err, IsNil)
+	c.Check(arity.SlotsPerPlugAny(), Equals, false)
+}
+
+func (s *baseDeclSuite) TestAutoConnectionSystemdUserControl(c *C) {
+	cand := s.connectCand(c, "systemd-user-control", "", "")
+	_, err := cand.CheckAutoConnect()
+	c.Check(err, NotNil)
+	c.Assert(err, ErrorMatches, "auto-connection denied by plug rule of interface \"systemd-user-control\"")
+
+	plugsSlots := `
+plugs:
+  systemd-user-control:
     allow-auto-connection: true
 `
 
@@ -1124,6 +1144,7 @@ func (s *baseDeclSuite) TestPlugInstallation(c *C) {
 		"snapd-control":                    true,
 		"steam-support":                    true,
 		"system-files":                     true,
+		"systemd-user-control":             true,
 		"tee":                              true,
 		"uinput":                           true,
 		"unity8":                           true,
@@ -1451,6 +1472,7 @@ func (s *baseDeclSuite) TestValidity(c *C) {
 		"snapd-control":                    true,
 		"steam-support":                    true,
 		"system-files":                     true,
+		"systemd-user-control":             true,
 		"tee":                              true,
 		"ubuntu-pro-control":               true,
 		"xdg-portal-permission-store":      true,
