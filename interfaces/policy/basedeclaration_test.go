@@ -861,6 +861,7 @@ var (
 		"network-status":            {"core"},
 		"ofono":                     {"app", "core"},
 		"online-accounts-service":   {"app"},
+		"pipewire":                  {"app"},
 		"power-control":             {"core"},
 		"ppp":                       {"core"},
 		"polkit-agent":              {"core"},
