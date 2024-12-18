@@ -630,6 +630,7 @@ dbus (send)
 /etc/xdg/autostart{,/**} r,
 /etc/xdg/user-dirs.conf r,
 /etc/xdg/user-dirs.defaults r,
+/etc/xdg/Xwayland-session.d{,**} r,
 /run/udev/tags/seat{,/**} r,
 
 # KDE Plasma specific extension
