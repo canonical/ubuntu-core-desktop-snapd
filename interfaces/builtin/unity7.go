@@ -284,15 +284,13 @@ dbus (send)
     bus=system
     path=/org/freedesktop/Accounts
     interface=org.freedesktop.DBus.Introspectable
-    member=Introspect
-    peer=(label=unconfined),
+    member=Introspect,
 
 dbus (send)
     bus=system
     path=/org/freedesktop/Accounts
     interface=org.freedesktop.Accounts
-    member=FindUserById
-    peer=(label=unconfined),
+    member=FindUserById,
 
 # Get() is an information leak
 # TODO: verify what it is leaking
@@ -300,8 +298,7 @@ dbus (receive, send)
     bus=system
     path=/org/freedesktop/Accounts/User[0-9]*
     interface=org.freedesktop.DBus.Properties
-    member={Get,PropertiesChanged}
-    peer=(label=unconfined),
+    member={Get,PropertiesChanged},
 
 # gmenu
 # Note: the gmenu DBus api was not designed for application isolation and apps
