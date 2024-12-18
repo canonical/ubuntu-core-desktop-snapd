@@ -75,22 +75,19 @@ dbus (send)
     bus=system
     path=/org/freedesktop/Accounts
     interface=org.freedesktop.DBus.Introspectable
-    member=Introspect
-    peer=(label=unconfined),
+    member=Introspect,
 
 dbus (receive, send)
     bus=system
     path=/org/freedesktop/Accounts
     interface=org.freedesktop.Accounts
-    member=FindUserByName
-    peer=(label=unconfined),
+    member=FindUserByName,
 
 dbus (receive, send)
     bus=system
     path=/org/freedesktop/Accounts/User[0-9]*
     interface=org.freedesktop.DBus.Properties
-    member={Get,GetAll,PropertiesChanged}
-    peer=(label=unconfined),
+    member={Get,GetAll,PropertiesChanged},
 
 # Allow agent to execute the setuid polkit-agent-helper-1 in a subprofile
 /usr/lib{exec,/polkit-1}/polkit-agent-helper-1 Cxr -> polkit_agent_helper,
