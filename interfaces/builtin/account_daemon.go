@@ -20,13 +20,11 @@
 package builtin
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/snapcore/snapd/interfaces"
 	"github.com/snapcore/snapd/interfaces/apparmor"
 	"github.com/snapcore/snapd/interfaces/seccomp"
-	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/snap"
 )
 
@@ -155,6 +153,7 @@ dbus (bind)
 /{,usr/}bin/passwd ixr,
 /{,usr/}bin/chage ixr,
 /{,usr/}sbin/user{add,del,mod} ixr,
+/usr/bin/lsattr ixr,
 
 # Allow modifying the non-system extrausers NSS database. The extrausers
 # database is used on Ubuntu Core devices to manage both privileged and
@@ -204,16 +203,20 @@ capability fsetid,
 /var/log/faillog rwk,
 /var/log/lastlog rwk,
 /var/log/tallylog rwk,
-
-capability chown,
 `
 
 // Needed because useradd uses a netlink socket, {{group}} is used as a
 // placeholder argument for the actual ID of a group owning /etc/shadow
-const accountDaemonConnectedSlotSecCompTemplate = `
-# useradd requires chowning to 0:'{{group}}'
-fchown - u:root {{group}}
-fchown32 - u:root {{group}}
+const accountDaemonSlotSecComp = `
+chown
+chown32
+chownat
+fchown
+fchown32
+fchownat
+lchown
+lchown32
+lchownat
 
 # from libaudit1
 bind
@@ -225,28 +228,8 @@ type accountDaemonInterface struct {
 	secCompSnippet string
 }
 
-func makeaccountDaemonSecCompSnippet() (string, error) {
-	gid, err := osutil.FindGidOwning("/var/lib/extrausers/shadow")
-	if err != nil {
-		return "", err
-	}
-
-	snippet := strings.Replace(accountDaemonConnectedSlotSecCompTemplate,
-		"{{group}}", strconv.FormatUint(gid, 10), -1)
-
-	return snippet, nil
-}
-
 func (iface *accountDaemonInterface) SecCompPermanentSlot(spec *seccomp.Specification, slot *snap.SlotInfo) error {
-	if iface.secCompSnippet == "" {
-		// Cache the snippet after it's successfully computed once
-		snippet, err := makeaccountDaemonSecCompSnippet()
-		if err != nil {
-			return err
-		}
-		iface.secCompSnippet = snippet
-	}
-	spec.AddSnippet(iface.secCompSnippet)
+	spec.AddSnippet(accountDaemonSlotSecComp)
 	return nil
 }
 
