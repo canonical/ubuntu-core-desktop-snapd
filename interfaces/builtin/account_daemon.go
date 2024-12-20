@@ -194,6 +194,7 @@ network netlink raw,
 capability audit_write,
 capability chown,
 capability fsetid,
+capability fowner,
 
 # useradd writes the result in the log
 # faillog tracks failed events, lastlog maintain records of the last
@@ -214,9 +215,6 @@ chownat
 fchown
 fchown32
 fchownat
-lchown
-lchown32
-lchownat
 
 # from libaudit1
 bind
