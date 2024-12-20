@@ -73,6 +73,17 @@ dbus (receive)
     interface=org.freedesktop.DBus.Properties
     member=PropertiesChanged
     peer=(label=###SLOT_SECURITY_TAGS###),
+# Receive Users changed events
+dbus (receive)
+    bus=system
+    path=/org/freedesktop/Accounts{,/User[0-9]*}
+    interface=org.freedesktop.Accounts.User
+    member=Changed
+    peer=(label=###SLOT_SECURITY_TAGS###),
+
+/var/cache/cracklib/{,**} r,
+/usr/sbin/usermod ixr,
+/etc/login.defs r,
 `
 
 const accountDaemonPermanentSlotAppArmor = `
@@ -97,29 +108,41 @@ dbus (receive)
     path=/org/freedesktop/Accounts{,/User[0-9]*}
     interface=org.freedesktop.DBus.Properties
     member=Get{,All},
-# Receive Accounts property changed events
+# Send Accounts property changed events
 dbus (send)
     bus=system
     path=/org/freedesktop/Accounts{,/User[0-9]*}
     interface=org.freedesktop.DBus.Properties
     member=PropertiesChanged,
+# Send Users changed events
+dbus (send)
+    bus=system
+    path=/org/freedesktop/Accounts/User[0-9]*
+    interface=org.freedesktop.Accounts.User
+    member=Changed,
 
 dbus (send)
     bus=system
-    path="/org/freedesktop/PolicyKit1/Authority"
-    interface="org.freedesktop.PolicyKit1.Authority"
-    member="{,Cancel}CheckAuthorization"
+    path=/org/freedesktop/PolicyKit1/Authority
+    interface=org.freedesktop.PolicyKit1.Authority
+    member={,Cancel}CheckAuthorization
     peer=(label=unconfined),
 
-#include <abstractions/dbus-strict>
+dbus (receive)
+    bus=system
+    path=/org/freedesktop/PolicyKit1/Authority
+    interface=org.freedesktop.PolicyKit1.Authority
+    member=Changed
+    peer=(label=unconfined),
+
 # Allow binding the service to the requested connection name
 dbus (bind)
     bus=system
     name="org.freedesktop.Accounts",
 
 /{,usr/}sbin/chpasswd ixr,
-/{,usr/}sbin/passwd ixr,
-/{,usr/}sbin/chage ixr,
+/{,usr/}bin/passwd ixr,
+/{,usr/}bin/chage ixr,
 /{,usr/}sbin/user{add,del,mod} ixr,
 
 # Allow modifying the non-system extrausers NSS database. The extrausers
@@ -141,6 +164,7 @@ dbus (bind)
 /etc/writable/locale.conf rw,
 /run/user/** rwkl,
 /run/user/ rw,
+/var/cache/cracklib/{,**} r,
 
 # Needed by useradd
 /etc/login.defs r,
@@ -188,7 +212,7 @@ type accountDaemonInterface struct {
 }
 
 func makeaccountDaemonSecCompSnippet() (string, error) {
-	gid, err := osutil.FindGidOwning("/etc/shadow")
+	gid, err := osutil.FindGidOwning("/var/lib/extrausers/shadow")
 	if err != nil {
 		return "", err
 	}
@@ -199,7 +223,7 @@ func makeaccountDaemonSecCompSnippet() (string, error) {
 	return snippet, nil
 }
 
-func (iface *accountDaemonInterface) SecCompConnectedSlot(spec *seccomp.Specification, slot *snap.SlotInfo) error {
+func (iface *accountDaemonInterface) SecCompPermanentSlot(spec *seccomp.Specification, slot *snap.SlotInfo) error {
 	if iface.secCompSnippet == "" {
 		// Cache the snippet after it's successfully computed once
 		snippet, err := makeaccountDaemonSecCompSnippet()
