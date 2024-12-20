@@ -80,6 +80,13 @@ dbus (receive)
     interface=org.freedesktop.Accounts.User
     member=Changed
     peer=(label=###SLOT_SECURITY_TAGS###),
+# Receive new user signal
+dbus (receive)
+    bus=system
+    path=/org/freedesktop/Accounts
+    interface=org.freedesktop.Accounts
+    member=User{Added,Deleted}
+    peer=(label=###SLOT_SECURITY_TAGS###),
 
 /var/cache/cracklib/{,**} r,
 /usr/sbin/usermod ixr,
@@ -98,6 +105,10 @@ dbus (receive)
     bus=system
     path=/org/freedesktop/Accounts
     interface=org.freedesktop.Accounts,
+dbus (send)
+    bus=system
+    path=/org/freedesktop/Accounts
+    interface=org.freedesktop.Accounts,
 dbus (receive)
     bus=system
     path=/org/freedesktop/Accounts/User[0-9]*
@@ -112,14 +123,12 @@ dbus (receive)
 dbus (send)
     bus=system
     path=/org/freedesktop/Accounts{,/User[0-9]*}
-    interface=org.freedesktop.DBus.Properties
-    member=PropertiesChanged,
+    interface=org.freedesktop.DBus.Properties,
 # Send Users changed events
 dbus (send)
     bus=system
     path=/org/freedesktop/Accounts/User[0-9]*
-    interface=org.freedesktop.Accounts.User
-    member=Changed,
+    interface=org.freedesktop.Accounts.User,
 
 dbus (send)
     bus=system
@@ -139,6 +148,8 @@ dbus (receive)
 dbus (bind)
     bus=system
     name="org.freedesktop.Accounts",
+
+/home/{,**} rw,
 
 /{,usr/}sbin/chpasswd ixr,
 /{,usr/}bin/passwd ixr,
@@ -162,6 +173,7 @@ dbus (bind)
 /etc/writable/lightdm/{,**} rw,
 /etc/locale.conf rw,
 /etc/writable/locale.conf rw,
+/etc/skel/{,**} r,
 /run/user/** rwkl,
 /run/user/ rw,
 /var/cache/cracklib/{,**} r,
@@ -192,6 +204,8 @@ capability fsetid,
 /var/log/faillog rwk,
 /var/log/lastlog rwk,
 /var/log/tallylog rwk,
+
+capability chown,
 `
 
 // Needed because useradd uses a netlink socket, {{group}} is used as a
