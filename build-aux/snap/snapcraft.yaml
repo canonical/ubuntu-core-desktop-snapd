@@ -277,6 +277,7 @@ parts:
       if [ -f test-build ]; then
           VERSION="1337.${VERSION}"
       fi
+      VERSION="$(echo $VERSION | cut -c1-32)"
       craftctl set version="$VERSION"
 
       ./get-deps.sh --skip-unused-check

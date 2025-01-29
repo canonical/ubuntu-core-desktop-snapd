@@ -135,6 +135,9 @@ func (s *AudioPlaybackInterfaceSuite) TestSecCompOnClassic(c *C) {
 	spec = seccomp.NewSpecification(s.classicSlot.AppSet())
 	c.Assert(spec.AddPermanentSlot(s.iface, s.classicSlotInfo), IsNil)
 	c.Assert(spec.SecurityTags(), HasLen, 0)
+
+	c.Check(spec.SnippetForTag("snap.audio-playback.app1"), Not(testutil.Contains), "/etc/pulse/ r,\n")
+	c.Check(spec.SnippetForTag("snap.audio-playback.app1"), Not(testutil.Contains), "/etc/pulse/** r,\n")
 }
 
 func (s *AudioPlaybackInterfaceSuite) TestAppArmor(c *C) {
