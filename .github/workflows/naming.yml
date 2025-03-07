@@ -16,6 +16,8 @@ jobs:
 
       - name: woke
         uses: get-woke/woke-action-reviewdog@v0
+        env:
+          INPUT_WOKE_VERSION: 'latest'
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           reporter: github-pr-check
