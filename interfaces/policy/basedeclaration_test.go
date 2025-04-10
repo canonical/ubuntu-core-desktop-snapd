@@ -1144,7 +1144,6 @@ func (s *baseDeclSuite) TestPlugInstallation(c *C) {
 		"snapd-control":                    true,
 		"steam-support":                    true,
 		"system-files":                     true,
-		"systemd-user-control":             true,
 		"tee":                              true,
 		"uinput":                           true,
 		"unity8":                           true,

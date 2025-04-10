@@ -23,7 +23,7 @@ const systemdUserControlSummary = `allows to control the user session service ma
 
 const systemdUserControlBaseDeclarationPlugs = `
   systemd-user-control:
-    allow-installation: false
+    allow-installation: true
     deny-auto-connection: true
 `
 
