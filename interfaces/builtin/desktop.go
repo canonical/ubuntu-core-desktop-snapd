@@ -676,6 +676,43 @@ dbus (receive, send)
     interface=org.freedesktop.DBus.Introspectable
     member=Introspect
     peer=(label=unconfined),
+
+# Allow desktop to execute the setuid passwd in a subprofile
+/{,usr/}bin/passwd Cxr -> passwd_helper,
+
+profile passwd_helper (attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+  /{,usr/}bin/passwd rm,
+  /var/cache/cracklib/* r,
+
+  # passwd performs PAM authentication, which includes
+  # pam-extrausers on Ubuntu Core.
+  #include <abstractions/nameservice>
+  #include <abstractions/authentication>
+  /etc/passwd rw,
+  /etc/group rw,
+  /etc/shadow rw,
+  /etc/gshadow rw,
+  /var/lib/extrausers/passwd rw,
+  /var/lib/extrausers/group rw,
+  /var/lib/extrausers/shadow rw,
+  /var/lib/extrausers/gshadow rw,
+  # passwd wants to create the .pwd.lock file
+  /var/lib/extrausers/.pwd rwk,
+  /var/lib/extrausers/.pwd.lock rwk,
+  /var/lib/extrausers/nshadow rw,
+  /var/lib/extrausers rw,
+
+  # Capabilities required by various PAM modules
+  capability audit_write,
+  capability sys_nice,
+
+  # If the user cancels auth, the agent will send SIGTERM to the helper
+  signal (receive) set=(term) peer=snap.@{SNAP_INSTANCE_NAME}.*,
+}
+
+# Allow to read password quality settings
+/etc/security/pwquality.conf r,
 `
 
 type desktopInterface struct {

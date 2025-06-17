@@ -820,6 +820,7 @@ var (
 	slotInstallation = map[string][]string{
 		// other
 		"adb-support":               {"core"},
+		"account-daemon":            {"app"},
 		"audio-playback":            {"app", "core"},
 		"audio-record":              {"app", "core"},
 		"autopilot-introspection":   {"core"},
