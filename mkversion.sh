@@ -115,6 +115,10 @@ if [ "$OUTPUT_ONLY" = true ]; then
     exit 0
 fi
 
+# ensure that version string has, at most, 32 characters,
+# to ensure that snapcraft doesn't complain.
+v=$(echo "$v" | cut -c1-32)
+
 echo "*** Setting version to '$v' from $o." >&2
 
 cat <<EOF > "$GO_GENERATE_BUILDDIR/snapdtool/version_generated.go"
