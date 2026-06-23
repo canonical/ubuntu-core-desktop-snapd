@@ -43,7 +43,7 @@ jobs:
             variant: pristine
 
   cache-build-deps:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -164,7 +164,7 @@ jobs:
 
   code-coverage:
     needs: [unit-tests, unit-tests-special]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     env:
       GOPATH: ${{ github.workspace }}
       # Set PATH to ignore the load of magic binaries from /usr/local/bin And
