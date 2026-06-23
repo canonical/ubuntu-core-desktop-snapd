@@ -550,6 +550,13 @@ dbus (send)
     member="Get{,All}"
     peer=(label=unconfined),
 
+dbus (send)
+    bus=session
+    path=/org/freedesktop/systemd1
+    interface=org.freedesktop.systemd1.Manager
+    member={StartTransientUnit,StopUnit}
+    peer=(label=unconfined),
+
 # Allow access to GDM's private reauthentication channel socket
 /run/gdm3/dbus/dbus-* rw,
 
