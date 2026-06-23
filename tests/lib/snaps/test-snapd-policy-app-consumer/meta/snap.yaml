@@ -5,6 +5,9 @@ description: Test policy app matching snapd version
 confinement: strict
 
 apps:
+  account-daemon:
+    command: bin/run
+    plugs: [ account-daemon ]
   acrn-support:
     command: bin/run
     plugs: [ acrn-support ]
