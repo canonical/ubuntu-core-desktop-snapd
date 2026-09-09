@@ -314,6 +314,9 @@ apps:
   firmware-updater-support:
     command: bin/run
     plugs: [ firmware-updater-support ]
+  systemd-user-control:
+    command: bin/run
+    plugs: [ systemd-user-control ]
 
 plugs:
   custom-device:
