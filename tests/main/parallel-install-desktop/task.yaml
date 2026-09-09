@@ -38,7 +38,8 @@ execute: |
     Name=Echo
     Comment=It echos stuff
     X-SnapAppName=echo
-    Exec=$SNAP_MOUNT_DIR/bin/basic-desktop_$instance.echo
+    Exec=/usr/bin/snap routine desktop-launch --desktop /var/lib/snapd/desktop/applications/basic-desktop+${instance}_echo.desktop -- %f
+    X-Snap-Exec=basic-desktop_$instance.echo
     EOF
 
         test -d "$SNAP_MOUNT_DIR/basic-desktop_$instance/x1"

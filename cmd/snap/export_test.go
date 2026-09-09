@@ -99,10 +99,9 @@ var (
 
 	GetSnapDirOptions                   = getSnapDirOptions
 	SnapInstancesAndComponentsFromNames = snapInstancesAndComponentsFromNames
-
-	GetSystemKeyRetryCount = getSystemKeyRetryCount
-
-	ComposeSubCmd = composeSubCmd
+	GetSystemKeyRetryCount              = getSystemKeyRetryCount
+	ComposeSubCmd                       = composeSubCmd
+	CmdlineArgsToUris                   = cmdlineArgsToUris
 )
 
 func HiddenCmd(descr string, completeHidden bool) *cmdInfo {
