@@ -64,6 +64,17 @@ dbus (send)
     member={Set,Get,GetAll}
     peer=(label=unconfined),
 
+# Allow reading properties (e.g. ActiveState) of individual units returned
+# by GetUnit/GetUnitByPID/LoadUnit, needed by session-manager code (e.g.
+# gnome-session-init-worker) that polls unit state before/while starting
+# the graphical session
+dbus (send)
+    bus=session
+    path=/org/freedesktop/systemd1/unit/**
+    interface=org.freedesktop.DBus.Properties
+    member={Get,GetAll}
+    peer=(label=unconfined),
+
 # Please note that SetEnvironment can alter existing units behavior (e.g. by setting LD_PRELOAD)
 # It is thus intended to be restricted only to snaps acting as a desktop session on Ubuntu Core systems
 #
@@ -91,6 +102,17 @@ dbus (send)
     path=/org/freedesktop/systemd1
     interface=org.freedesktop.systemd1.Manager
     member={ResetFailed,Reload,StartUnit,StopUnit,RestartUnit}
+    peer=(label=unconfined),
+
+# Allow looking up a unit's object path by name (e.g. to then read its
+# ActiveState property via the Properties.Get rule above), needed by
+# session-manager code (e.g. gnome-session-init-worker) to check whether
+# graphical-session.target is already active before (re-)starting it
+dbus (send)
+    bus=session
+    path=/org/freedesktop/systemd1
+    interface=org.freedesktop.systemd1.Manager
+    member=GetUnit
     peer=(label=unconfined),
 `
 

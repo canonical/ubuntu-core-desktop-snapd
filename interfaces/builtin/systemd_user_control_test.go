@@ -85,6 +85,8 @@ func (s *SystemdUserControlInterfaceSuite) TestUsedSecuritySystems(c *C) {
 	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "bus=session")
 	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "bus=system")
 	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "UpdateActivationEnvironment")
+	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "member=GetUnit")
+	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "path=/org/freedesktop/systemd1/unit/**")
 }
 
 func (s *SystemdUserControlInterfaceSuite) TestInterfaces(c *C) {
