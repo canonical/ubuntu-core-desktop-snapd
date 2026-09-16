@@ -79,6 +79,65 @@ const desktopLaunchConnectedPlugAppArmor = `
 /snap/snapd/*/usr/bin/snap ixr,
 /snap/snapd/*{,/usr}/lib/@{multiarch}/lib*.so* mr,
 
+# "snap run" execs snap-confine (via syscall.Exec, replacing its own
+# image) to actually enter the target snap's confinement. snap-confine
+# has its own dedicated AppArmor profile, so this needs a discrete
+# profile transition (not just "ix") from the caller's profile.
+/usr/lib/snapd/snap-confine px,
+/snap/snapd/*/usr/lib/snapd/snap-confine px,
+
+# "snap run" computes a system-key before it execs snap-confine and
+# transitions to the launched snap's own profile, so this still runs
+# under the caller's (this plug's) profile. Without these, the caller
+# gets EPERM computing the system key and the target snap never starts
+# (e.g. "cannot determine seccomp compiler version in generateSystemKey").
+/proc/sys/kernel/seccomp/actions_avail r,
+/snap/snapd/*/usr/lib/snapd/snap-seccomp ixr,
+
+# "snap run" also reads the target snap's sequence file (dir options,
+# e.g. whether it's classic/using hidden snap dirs) before exec'ing
+# snap-confine, again still under the caller's profile.
+/var/lib/snapd/sequence/*.json r,
+
+# "snap run" also creates (if missing) and enters the launched snap's
+# own private XDG_RUNTIME_DIR subdirectory before exec'ing
+# snap-confine, still under the caller's profile.
+/run/user/[0-9]*/ w,
+/run/user/[0-9]*/snap.*/ rw,
+
+# "snap run" launches the target snap in its own transient scope via
+# the user systemd manager (over the session bus), still under the
+# caller's profile.
+dbus (send)
+    bus=session
+    path=/org/freedesktop/systemd1
+    interface=org.freedesktop.systemd1.Manager
+    member=StartTransientUnit
+    peer=(label=unconfined),
+
+# Allow observing the JobRemoved signal which informs the caller of
+# StartTransientUnit that the job has been dispatched and that the
+# transient scope has finished starting.
+dbus (receive)
+    bus=session
+    path=/org/freedesktop/systemd1
+    interface=org.freedesktop.systemd1.Manager
+    member=JobRemoved
+    peer=(label=unconfined),
+
+# GTK4/libadwaita apps (e.g. gnome-terminal-server rendering any icon,
+# such as its own window/tab icons) sandbox image decoding via glycin,
+# which itself spawns a "bwrap" helper to run the actual decoder
+# ("glycin-image-rs") isolated in its own user/mount namespace. Setting
+# up that namespace requires reading the kernel's overflow uid/gid, and
+# without it bwrap's child aborts immediately (exit status 1), which in
+# turn makes glycin/gdk-pixbuf treat this as a fatal
+# "ensure_surface_for_gicon" GTK assertion failure and abort the whole
+# app (e.g. gnome-terminal-server core-dumps on its very first icon
+# load after every (re)start).
+@{PROC}/sys/kernel/overflowuid r,
+@{PROC}/sys/kernel/overflowgid r,
+
 #include <abstractions/dbus-session-strict>
 
 dbus (send)
@@ -87,6 +146,18 @@ dbus (send)
     interface=io.snapcraft.PrivilegedDesktopLauncher
     member={OpenDesktopEntry,OpenDesktopEntry2}
     peer=(label=unconfined),
+
+# Allow D-Bus traffic with other apps of this same snap (e.g. a
+# desktop-session app confined per-unit via systemd's AppArmorProfile=,
+# such as gnome-shell talking to this xdg-desktop-portal-gnome-style
+# D-Bus-activated, daemon-scope=user app)
+dbus (receive, send)
+    peer=(label="snap.@{SNAP_INSTANCE_NAME}.**"),
+
+# D-Bus-activated, daemon-scope=user apps (e.g. an xdg-desktop-portal
+# implementation) started as a direct child of the unconfined
+# systemd --user receive their activation socket/fd from it
+unix (receive, send) type=stream peer=(label=unconfined),
 `
 
 func (iface *desktopLaunchInterface) Name() string {

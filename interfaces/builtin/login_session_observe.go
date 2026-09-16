@@ -73,7 +73,7 @@ dbus (send)
 
 dbus (receive)
     bus=system
-    path=/org/freedesktop/login1
+    path=/org/freedesktop/login1{,/seat/*,/session/*,/user/*}
     interface=org.freedesktop.DBus.Properties
     member=PropertiesChanged
     peer=(label=unconfined),
