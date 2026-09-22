@@ -73,6 +73,17 @@ dbus (send)
     member="GetConnectionCredentials"
     peer=(name=org.freedesktop.DBus, label=unconfined),
 
+# Allow enumerating the names on the bus. Many services (notably KDE
+# Plasma's plasmashell) call ListNames/ListActivatableNames on the bus
+# daemon itself to discover peers; without this they fail with
+# "Could not get list of available D-Bus services ... AccessDenied".
+dbus (send)
+    bus=###DBUS_BUS###
+    path={/,/org/freedesktop/DBus}
+    interface=org.freedesktop.DBus
+    member={ListNames,ListActivatableNames}
+    peer=(name=org.freedesktop.DBus, label=unconfined),
+
 # bind to a well-known DBus name: ###DBUS_NAME###
 dbus (bind)
     bus=###DBUS_BUS###

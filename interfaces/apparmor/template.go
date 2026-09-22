@@ -401,6 +401,10 @@ var templateCommon = `
   # Note: this does not grant access to the DBus sockets of well known buses
   # (will still need to use an appropriate interface for that).
   dbus (receive, send) peer=(label=snap.@{SNAP_INSTANCE_NAME}.*),
+  # Allow apps from the same package to read /proc/<pid>/... of sibling app
+  # processes (mediated as ptrace (read)); note 'ptrace (trace)' remains
+  # explicitly denied in ptraceTraceDenySnippet below.
+    ptrace (read) peer=snap.@{SNAP_INSTANCE_NAME}.*,
   # In addition to the above, dbus-run-session attempts reading these files
   # from the snap base runtime.
   /usr/share/dbus-1/services/{,*} r,

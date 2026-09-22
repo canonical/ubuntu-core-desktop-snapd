@@ -44,6 +44,12 @@ const polkitAgentConnectedPlugAppArmor = `
 
 #include <abstractions/dbus-strict>
 
+# Allow reading the cgroup path of processes (incl. of this agent, whose
+# /proc/<pid>/cgroup file is owned by root) to determine snap confinement;
+# the plain 'owner @{PROC}/@{pid}/cgroup' template rule does not match
+# because the file's owner is root.
+@{PROC}/[0-9]*/cgroup r,
+
 # Allow application to register as an agent with polkitd
 dbus (receive, send)
     bus=system

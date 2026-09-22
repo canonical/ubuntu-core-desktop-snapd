@@ -142,6 +142,16 @@ dbus (send)
     member=GetNameOwner
     peer=(label=unconfined),
 
+# Allow listing the names on the session/system bus, used by Qt/KDE
+# session components (e.g. plasmashell) to enumerate available services
+# during startup. Same category as GetNameOwner above.
+dbus (send)
+    bus={session,system}
+    path=/
+    interface=org.freedesktop.DBus
+    member=ListNames
+    peer=(label=unconfined),
+
 # Allow looking up a unit's object path by name (e.g. to then read its
 # ActiveState property via the Properties.Get rule above), needed by
 # session-manager code (e.g. gnome-session-init-worker) to check whether

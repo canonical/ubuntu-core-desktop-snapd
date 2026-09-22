@@ -303,6 +303,7 @@ func (s *DbusInterfaceSuite) TestPermanentSlotAppArmorSession(c *C) {
 
 	// verify shared permanent slot policy
 	c.Check(snippet, testutil.Contains, "dbus (send)\n    bus=session\n    path=/org/freedesktop/DBus\n    interface=org.freedesktop.DBus\n    member=\"{Request,Release}Name\"\n    peer=(name=org.freedesktop.DBus, label=unconfined),\n")
+	c.Check(snippet, testutil.Contains, "dbus (send)\n    bus=session\n    path={/,/org/freedesktop/DBus}\n    interface=org.freedesktop.DBus\n    member={ListNames,ListActivatableNames}\n    peer=(name=org.freedesktop.DBus, label=unconfined),\n")
 
 	// verify individual bind rules
 	c.Check(snippet, testutil.Contains, "dbus (bind)\n    bus=session\n    name=org.test-session-slot,\n")
