@@ -227,6 +227,31 @@ owner /run/user/[0-9]*/.mutter-Xwaylandauth.* rw,
 # mutter/mesa shader cache, created on first GL context creation
 owner @{HOME}/.cache/mesa_shader_cache/{,**} rw,
 
+# The confined desktop session (run-session.sh and the services it
+# execs, e.g. startplasma-wayland -> kwin -> plasmashell) needs to
+# create and access the XDG user directories (~/Desktop, ~/Documents,
+# ~/Downloads, ...) in the real $HOME. plasmashell's folder-view desktop
+# containment dereferences ~/Desktop at startup: on first login the
+# unconfined host xdg-user-dirs.service may not have created it yet (it
+# races session start), so plasmashell aborts with "The file or folder
+# /home/<user>/Desktop does not exist" and the desktop only recovers on
+# re-login. The standard home interface only permits creating the
+# @{HOME}/{s,sn,sna} prefixes (for ~/snap), so grant the same
+# top-level-create ability for the fixed XDG user-directory names,
+# mirroring the home interface's {,…}{,/} pattern.
+#
+# XXX BUG: XDG directories are dynamically configured in ~/.config/user-dirs.dirs and are localized based on the user's language.
+# If a French user logs in, their desktop is ~/Bureau and their downloads are ~/Téléchargements. This AppArmor rule entirely breaks for non-English locales because it strictly hardcodes the English folder names.
+
+owner @{HOME}/Desktop/ rwkl,
+owner @{HOME}/Documents/ rwkl,
+owner @{HOME}/Downloads/ rwkl,
+owner @{HOME}/Music/ rwkl,
+owner @{HOME}/Pictures/ rwkl,
+owner @{HOME}/Public/ rwkl,
+owner @{HOME}/Templates/ rwkl,
+owner @{HOME}/Videos/ rwkl,
+
 # systemd --user runs "gnome-session-ctl --signal-init" (unconfined, as
 # part of the gnome-session-manager@.service startup sequence) to tell
 # the session manager it has finished the "Initialization" bring-up
