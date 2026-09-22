@@ -202,6 +202,7 @@ owner @{HOME}/.profile r,
 /sys/fs/cgroup/user.slice/user-[0-9]*.slice/cpu.max r,
 /sys/fs/cgroup/user.slice/user-[0-9]*.slice/user@[0-9]*.service/cpu.max r,
 /sys/fs/cgroup/user.slice/user-[0-9]*.slice/user@[0-9]*.service/session.slice/cpu.max r,
+/sys/fs/cgroup/user.slice/user-[0-9]*.slice/user@[0-9]*.service/app.slice/cpu.max r,
 
 # Allow the session manager (gnome-session-service) to notify systemd
 # --user of its startup state via sd_notify, same as the system-level

@@ -109,7 +109,7 @@ dbus (send)
     bus=system
     path=/org/freedesktop/login1
     interface=org.freedesktop.login1.Manager
-    member=Get{Seat,Session,User},
+    member=Get{Seat,Session,User,GetSessionByPID},
 `
 
 type loginSessionObserveInterface struct {
