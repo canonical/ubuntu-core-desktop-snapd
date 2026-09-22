@@ -116,6 +116,12 @@ dbus (send)
     path=/org/freedesktop/login1
     interface=org.freedesktop.login1.Manager
     member=GetSessionByPID,
+
+dbus (send)
+    bus=system
+    path=/org/freedesktop/login1
+    interface=org.freedesktop.login1.Manager
+    member=CanRebootToBootLoaderMenu,
 `
 
 type loginSessionObserveInterface struct {
