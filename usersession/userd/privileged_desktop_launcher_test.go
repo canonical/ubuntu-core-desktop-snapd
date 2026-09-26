@@ -20,6 +20,7 @@
 package userd_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -60,7 +61,7 @@ func (s *privilegedDesktopLauncherSuite) SetUpTest(c *C) {
   Categories=Game
   `
 	tmpMircadeDesktop := strings.Replace(rawMircadeDesktop, "/var/lib/snapd/desktop/applications", dirs.SnapDesktopFilesDir, -1)
-	desktopContent := strings.Replace(tmpMircadeDesktop, "/snap/bin/", dirs.SnapBinariesDir, -1)
+	desktopContent := strings.Replace(tmpMircadeDesktop, "/snap/bin/", dirs.SnapBinariesDir+string(os.PathSeparator), -1)
 
 	deskTopFile := filepath.Join(dirs.SnapDesktopFilesDir, "mircade_mircade.desktop")
 	c.Assert(os.WriteFile(deskTopFile, []byte(desktopContent), 0644), IsNil)
@@ -142,6 +143,25 @@ func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2SucceedsWithURIs(c
 
 	err := s.launcher.OpenDesktopEntry2("mircade_mircade.desktop", "", []string{"file:///test.txt"}, nil, ":some-dbus-sender")
 	c.Check(err, IsNil)
+}
+
+func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2ResetsSnapAndRuntimeEnvironment(c *C) {
+	runtimeDir := fmt.Sprintf("/run/user/%d", os.Getuid())
+	runtimeEnvFile := filepath.Join(c.MkDir(), "runtime-dir")
+	cmd := testutil.MockCommand(c, "systemd-run", fmt.Sprintf(`printf '%%s' "$XDG_RUNTIME_DIR" > %q`, runtimeEnvFile))
+	defer cmd.Restore()
+
+	s.mockEnv("XDG_RUNTIME_DIR", "/run/user/1000/snap.ubuntu-desktop-session")
+	err := s.launcher.OpenDesktopEntry2("mircade_mircade.desktop", "", nil, nil, ":some-dbus-sender")
+	c.Assert(err, IsNil)
+	c.Check(cmd.Calls(), DeepEquals, [][]string{{
+		"systemd-run", "--user", "--collect", "--setenv=SNAP=",
+		fmt.Sprintf("--setenv=XDG_RUNTIME_DIR=%s", runtimeDir), "--",
+		filepath.Join(dirs.SnapBinariesDir, "mircade"),
+	}})
+	runtimeEnv, readErr := os.ReadFile(runtimeEnvFile)
+	c.Assert(readErr, IsNil)
+	c.Check(string(runtimeEnv), Equals, runtimeDir)
 }
 
 func (s *privilegedDesktopLauncherSuite) TestOpenDesktopEntry2WithEnv(c *C) {

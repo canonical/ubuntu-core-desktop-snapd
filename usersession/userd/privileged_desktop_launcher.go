@@ -125,6 +125,15 @@ func (s *PrivilegedDesktopLauncher) OpenDesktopEntry2(desktopFileID string, acti
 		// systemd not available
 		return dbus.MakeFailedError(err)
 	}
+	runtimeDir := fmt.Sprintf("/run/user/%d", os.Getuid())
+	// The user systemd manager can carry snap-specific variables from a
+	// confined desktop session. Clear SNAP to prevent re-entering this
+	// launcher, and set the transient app's runtime root so desktop-launch
+	// can reach the session bus before snap-confine sets its own runtime dir.
+	args = append(args,
+		"--setenv=SNAP=",
+		fmt.Sprintf("--setenv=XDG_RUNTIME_DIR=%s", runtimeDir),
+	)
 	if args, err = appendEnvironment(args, environment); err != nil {
 		return dbus.MakeFailedError(err)
 	}
@@ -132,6 +141,14 @@ func (s *PrivilegedDesktopLauncher) OpenDesktopEntry2(desktopFileID string, acti
 	args = append(args, execArgs...)
 
 	cmd := exec.Command("systemd-run", args...)
+	// systemd-run uses the caller's XDG_RUNTIME_DIR to connect to the user
+	// manager, so it must not inherit the confined desktop's snap-scoped path.
+	cmdEnv, err := osutil.OSEnvironment()
+	if err != nil {
+		return dbus.MakeFailedError(err)
+	}
+	cmdEnv["XDG_RUNTIME_DIR"] = runtimeDir
+	cmd.Env = cmdEnv.ForExec()
 
 	if err := cmd.Run(); err != nil {
 		return dbus.MakeFailedError(fmt.Errorf("cannot run %q: %v", args, err))
