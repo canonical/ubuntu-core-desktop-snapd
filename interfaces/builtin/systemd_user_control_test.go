@@ -94,40 +94,60 @@ func (s *SystemdUserControlInterfaceSuite) TestUsedSecuritySystems(c *C) {
 	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "path=/org/freedesktop/systemd1/unit/**")
 }
 
-func (s *SystemdUserControlInterfaceSuite) TestUnitControlIsLimitedToSessionLeader(c *C) {
-	var mockPlugSnapInfoYaml = `name: ubuntu-desktop-session
+func (s *SystemdUserControlInterfaceSuite) TestUnitControlIsLimitedToSessionLeaders(c *C) {
+	for _, sessionSnap := range []string{"ubuntu-desktop-session", "plasma-desktop-session"} {
+		mockPlugSnapInfoYaml := "name: " + sessionSnap + `
 version: 1.0
 apps:
- ubuntu-desktop-session:
+ ` + sessionSnap + `:
   command: foo
+  plugs: [systemd-user-control]
+ plasma-kwin-wayland:
+  command: kwin
   plugs: [systemd-user-control]
  other:
   command: bar
   plugs: [systemd-user-control]
 `
-	var mockSlotSnapInfoYaml = `name: core
+		var mockSlotSnapInfoYaml = `name: core
 version: 0
 type: os
 slots:
   systemd-user-control:
 `
-	plug, _ := MockConnectedPlug(c, mockPlugSnapInfoYaml, nil, "systemd-user-control")
-	slot, _ := MockConnectedSlot(c, mockSlotSnapInfoYaml, nil, "systemd-user-control")
+		plug, _ := MockConnectedPlug(c, mockPlugSnapInfoYaml, nil, "systemd-user-control")
+		slot, _ := MockConnectedSlot(c, mockSlotSnapInfoYaml, nil, "systemd-user-control")
 
-	appSet, err := interfaces.NewSnapAppSet(plug.Snap(), nil)
-	c.Assert(err, IsNil)
-	spec := apparmor.NewSpecification(appSet)
-	c.Assert(spec.AddConnectedPlug(s.iface, plug, slot), IsNil)
-	snippets := spec.Snippets()
+		appSet, err := interfaces.NewSnapAppSet(plug.Snap(), nil)
+		c.Assert(err, IsNil)
+		spec := apparmor.NewSpecification(appSet)
+		c.Assert(spec.AddConnectedPlug(s.iface, plug, slot), IsNil)
+		snippets := spec.Snippets()
 
-	leaderRules := strings.Join(snippets["snap.ubuntu-desktop-session.ubuntu-desktop-session"], "\n")
-	c.Assert(leaderRules, testutil.Contains, "member={GetUnit,StartUnit,ResetFailed}")
-	c.Assert(leaderRules, testutil.Contains, "member=PropertiesChanged")
-	c.Assert(leaderRules, Not(testutil.Contains), "UnsetAndSetEnvironment")
+		leaderTag := "snap." + sessionSnap + "." + sessionSnap
+		leaderRules := strings.Join(snippets[leaderTag], "\n")
+		c.Assert(leaderRules, testutil.Contains, "member={GetUnit,StartUnit,ResetFailed}")
+		c.Assert(leaderRules, testutil.Contains, "member=PropertiesChanged")
+		c.Assert(leaderRules, Not(testutil.Contains), "UnsetAndSetEnvironment")
+		if sessionSnap == "plasma-desktop-session" {
+			c.Assert(leaderRules, testutil.Contains, "member={ListUnitFilesByPatterns,Reload,SetEnvironment,UnsetEnvironment}")
+			c.Assert(leaderRules, testutil.Contains, "interface=org.freedesktop.DBus.Properties\n        member=Get")
+		} else {
+			c.Assert(leaderRules, Not(testutil.Contains), "member=SetEnvironment")
+		}
 
-	otherRules := strings.Join(snippets["snap.ubuntu-desktop-session.other"], "\n")
-	c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1.Manager")
-	c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1/unit/")
+		if sessionSnap == "plasma-desktop-session" {
+			kwinRules := strings.Join(snippets["snap."+sessionSnap+".plasma-kwin-wayland"], "\n")
+			c.Assert(kwinRules, testutil.Contains, "member=UpdateActivationEnvironment")
+			c.Assert(kwinRules, testutil.Contains, "interface=org.freedesktop.systemd1.Manager\n        member=SetEnvironment")
+			c.Assert(kwinRules, Not(testutil.Contains), "member=StartUnit")
+		}
+
+		otherRules := strings.Join(snippets["snap."+sessionSnap+".other"], "\n")
+		c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1.Manager")
+		c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1/unit/")
+		c.Assert(otherRules, Not(testutil.Contains), "UpdateActivationEnvironment")
+	}
 }
 
 func (s *SystemdUserControlInterfaceSuite) TestInterfaces(c *C) {

@@ -206,7 +206,7 @@ dbus (receive)
 `
 
 const systemdUserControlSessionManagerAppArmor = `
-    # Only the systemd-backed GNOME Session leader directly controls user units.
+    # Only the desktop session leaders directly control user units.
     dbus (send)
         bus=session
         path=/org/freedesktop/systemd1
@@ -229,6 +229,42 @@ const systemdUserControlSessionManagerAppArmor = `
         peer=(label=unconfined),
     `
 
+const systemdUserControlPlasmaSessionAppArmor = `
+    # startplasma-wayland also refreshes the systemd user manager's unit
+    # cache and activation environment before starting the Plasma session.
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1
+        interface=org.freedesktop.systemd1.Manager
+        member={ListUnitFilesByPatterns,Reload,SetEnvironment,UnsetEnvironment}
+        peer=(label=unconfined),
+
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1
+        interface=org.freedesktop.DBus.Properties
+        member=Get
+        peer=(label=unconfined),
+    `
+
+const systemdUserControlPlasmaKWinAppArmor = `
+    # KWin publishes the Wayland and Xwayland display variables for
+    # systemd- and D-Bus-activated session applications.
+    dbus (send)
+        bus=session
+        path=/
+        interface=org.freedesktop.DBus
+        member=UpdateActivationEnvironment
+        peer=(label=unconfined),
+
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1
+        interface=org.freedesktop.systemd1.Manager
+        member=SetEnvironment
+        peer=(label=unconfined),
+    `
+
 type systemdUserControlInterface struct {
 	commonInterface
 }
@@ -242,11 +278,22 @@ func (iface *systemdUserControlInterface) AppArmorConnectedPlug(
 		return err
 	}
 
-	targetTag := fmt.Sprintf("snap.%s.ubuntu-desktop-session", plug.Snap().InstanceName())
+	instanceName := plug.Snap().InstanceName()
+	plasmaSessionManagerTag := fmt.Sprintf("snap.%s.plasma-desktop-session", instanceName)
+	plasmaKWinTag := fmt.Sprintf("snap.%s.plasma-kwin-wayland", instanceName)
+	sessionManagerTags := map[string]struct{}{
+		fmt.Sprintf("snap.%s.ubuntu-desktop-session", instanceName): {},
+		plasmaSessionManagerTag: {},
+	}
 	for _, runnable := range plug.Runnables() {
-		if runnable.SecurityTag == targetTag {
-			spec.AddSnippetForTag(targetTag, systemdUserControlSessionManagerAppArmor)
-			break
+		if _, ok := sessionManagerTags[runnable.SecurityTag]; ok {
+			spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlSessionManagerAppArmor)
+			if runnable.SecurityTag == plasmaSessionManagerTag {
+				spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlPlasmaSessionAppArmor)
+			}
+		}
+		if runnable.SecurityTag == plasmaKWinTag {
+			spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlPlasmaKWinAppArmor)
 		}
 	}
 	return nil
