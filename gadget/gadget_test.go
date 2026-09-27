@@ -61,11 +61,12 @@ defaults:
     something: true
 
 connections:
-  - plug: snapid1:plg1
-    slot: snapid2:slot
-  - plug: snapid3:process-control
-  - plug: snapid4:pctl4
+  - plug: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:plg1
+    slot: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:slot
+  - plug: cccccccccccccccccccccccccccccccc:process-control
+  - plug: dddddddddddddddddddddddddddddddd:pctl4
     slot: system:process-control
+  - plug: ubuntu-desktop-session:desktop-launch
 
 volumes:
   volumename:
@@ -827,9 +828,10 @@ func (s *gadgetYamlTestSuite) TestReadGadgetYamlValid(c *C) {
 			"system": {"something": true},
 		},
 		Connections: []gadget.Connection{
-			{Plug: gadget.ConnectionPlug{SnapID: "snapid1", Plug: "plg1"}, Slot: gadget.ConnectionSlot{SnapID: "snapid2", Slot: "slot"}},
-			{Plug: gadget.ConnectionPlug{SnapID: "snapid3", Plug: "process-control"}, Slot: gadget.ConnectionSlot{SnapID: "system", Slot: "process-control"}},
-			{Plug: gadget.ConnectionPlug{SnapID: "snapid4", Plug: "pctl4"}, Slot: gadget.ConnectionSlot{SnapID: "system", Slot: "process-control"}},
+			{Plug: gadget.ConnectionPlug{SnapID: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Plug: "plg1"}, Slot: gadget.ConnectionSlot{SnapID: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Slot: "slot"}},
+			{Plug: gadget.ConnectionPlug{SnapID: "cccccccccccccccccccccccccccccccc", Plug: "process-control"}, Slot: gadget.ConnectionSlot{SnapID: "system", Slot: "process-control"}},
+			{Plug: gadget.ConnectionPlug{SnapID: "dddddddddddddddddddddddddddddddd", Plug: "pctl4"}, Slot: gadget.ConnectionSlot{SnapID: "system", Slot: "process-control"}},
+			{Plug: gadget.ConnectionPlug{SnapName: "ubuntu-desktop-session", Plug: "desktop-launch"}, Slot: gadget.ConnectionSlot{SnapID: "system", Slot: "desktop-launch"}},
 		},
 		Volumes: map[string]*gadget.Volume{
 			"volumename": {
@@ -1004,8 +1006,9 @@ connections:
 		{``, `gadget connection plug cannot be empty`},
 		{`foo:bar baz:quux`, `(?s).*unmarshal errors:.*`},
 		{`plug: foo:`, `.*mapping values are not allowed in this context`},
-		{`plug: ":"`, `.*in gadget connection plug: expected "\(<snap-id>\|system\):name" not ":"`},
-		{`slot: "foo:"`, `.*in gadget connection slot: expected "\(<snap-id>\|system\):name" not "foo:"`},
+		{`plug: ":"`, `.*in gadget connection plug: expected "\(<snap-id>\|<snap-name>\|system\):name" not ":"`},
+		{`plug: "@invalid@:plug"`, `.*in gadget connection plug: expected "\(<snap-id>\|<snap-name>\|system\):name" not "@invalid@:plug"`},
+		{`slot: "foo:"`, `.*in gadget connection slot: expected "\(<snap-id>\|<snap-name>\|system\):name" not "foo:"`},
 		{`slot: foo:bar`, `gadget connection plug cannot be empty`},
 	}
 

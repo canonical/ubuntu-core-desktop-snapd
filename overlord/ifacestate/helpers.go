@@ -832,10 +832,6 @@ func (gc *gadgetConnect) addGadgetConnections(newconns map[string]*interfaces.Co
 		return err
 	}
 	snapID := snapInfo.SnapID
-	if snapID == "" {
-		// not a snap-id identifiable snap, skip
-		return nil
-	}
 
 	gconns, err := snapstate.GadgetConnections(gc.st, gc.deviceCtx)
 	if err != nil {
@@ -849,10 +845,10 @@ func (gc *gadgetConnect) addGadgetConnections(newconns map[string]*interfaces.Co
 	// consider the gadget connect instructions
 	for _, gconn := range gconns {
 		var plugSnapName, slotSnapName string
-		if gconn.Plug.SnapID == snapID {
+		if gadgetConnectionRefMatchesSnap(gconn.Plug.SnapID, gconn.Plug.SnapName, snapID, snapName) {
 			plugSnapName = snapName
 		}
-		if gconn.Slot.SnapID == snapID {
+		if gadgetConnectionRefMatchesSnap(gconn.Slot.SnapID, gconn.Slot.SnapName, snapID, snapName) {
 			slotSnapName = snapName
 		}
 
@@ -863,27 +859,27 @@ func (gc *gadgetConnect) addGadgetConnections(newconns map[string]*interfaces.Co
 
 		if plugSnapName == "" {
 			var err error
-			plugSnapName, err = resolveSnapIDToName(gc.st, gconn.Plug.SnapID)
+			plugSnapName, err = resolveGadgetConnectionSnapName(gc.st, gconn.Plug.SnapID, gconn.Plug.SnapName)
 			if err != nil {
 				return err
 			}
 		}
 		plug := gc.repo.Plug(plugSnapName, gconn.Plug.Plug)
 		if plug == nil {
-			task.Logf("gadget connections: ignoring missing plug %s:%s", gconn.Plug.SnapID, gconn.Plug.Plug)
+			task.Logf("gadget connections: ignoring missing plug %s:%s", gadgetConnectionSnapRef(gconn.Plug.SnapID, gconn.Plug.SnapName), gconn.Plug.Plug)
 			continue
 		}
 
 		if slotSnapName == "" {
 			var err error
-			slotSnapName, err = resolveSnapIDToName(gc.st, gconn.Slot.SnapID)
+			slotSnapName, err = resolveGadgetConnectionSnapName(gc.st, gconn.Slot.SnapID, gconn.Slot.SnapName)
 			if err != nil {
 				return err
 			}
 		}
 		slot := gc.repo.Slot(slotSnapName, gconn.Slot.Slot)
 		if slot == nil {
-			task.Logf("gadget connections: ignoring missing slot %s:%s", gconn.Slot.SnapID, gconn.Slot.Slot)
+			task.Logf("gadget connections: ignoring missing slot %s:%s", gadgetConnectionSnapRef(gconn.Slot.SnapID, gconn.Slot.SnapName), gconn.Slot.Slot)
 			continue
 		}
 
@@ -893,6 +889,27 @@ func (gc *gadgetConnect) addGadgetConnections(newconns map[string]*interfaces.Co
 	}
 
 	return nil
+}
+
+func gadgetConnectionRefMatchesSnap(refSnapID, refSnapName, snapID, snapName string) bool {
+	if refSnapName != "" {
+		return refSnapName == snapName
+	}
+	return refSnapID == snapID
+}
+
+func resolveGadgetConnectionSnapName(st *state.State, snapID, snapName string) (string, error) {
+	if snapName != "" {
+		return snapName, nil
+	}
+	return resolveSnapIDToName(st, snapID)
+}
+
+func gadgetConnectionSnapRef(snapID, snapName string) string {
+	if snapName != "" {
+		return snapName
+	}
+	return snapID
 }
 
 func addNewConnection(st *state.State, task *state.Task, newconns map[string]*interfaces.ConnRef, conns map[string]*schema.ConnState, plug *snap.PlugInfo, slot *snap.SlotInfo, conflictError func(*state.Retry, error) error) error {

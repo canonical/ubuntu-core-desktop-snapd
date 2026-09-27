@@ -968,10 +968,12 @@ func AllDiskVolumeDeviceTraits(allVols map[string]*Volume, optsPerVolume map[str
 // GadgetConnect describes an interface connection requested by the gadget
 // between seeded snaps. The syntax is of a mapping like:
 //
-//	plug: (<plug-snap-id>|system):plug
-//	[slot: (<slot-snap-id>|system):slot]
+//	plug: (<plug-snap-id>|<plug-snap-name>|system):plug
+//	[slot: (<slot-snap-id>|<slot-snap-name>|system):slot]
 //
 // "system" indicates a system plug or slot.
+// Snap names may be used for snaps included in the seed that do not have a
+// snap-id, such as locally built dangerous snaps.
 // Fully omitting the slot part indicates a system slot with the same name
 // as the plug.
 type Connection struct {
@@ -980,12 +982,13 @@ type Connection struct {
 }
 
 type ConnectionPlug struct {
-	SnapID string
-	Plug   string
+	SnapID   string
+	SnapName string
+	Plug     string
 }
 
 func (gcplug *ConnectionPlug) Empty() bool {
-	return gcplug.SnapID == "" && gcplug.Plug == ""
+	return gcplug.SnapID == "" && gcplug.SnapName == "" && gcplug.Plug == ""
 }
 
 func (gcplug *ConnectionPlug) UnmarshalYAML(unmarshal func(any) error) error {
@@ -993,22 +996,24 @@ func (gcplug *ConnectionPlug) UnmarshalYAML(unmarshal func(any) error) error {
 	if err := unmarshal(&s); err != nil {
 		return err
 	}
-	snapID, name, err := parseSnapIDColonName(s)
+	snapID, snapName, name, err := parseSnapRefColonName(s)
 	if err != nil {
 		return fmt.Errorf("in gadget connection plug: %v", err)
 	}
 	gcplug.SnapID = snapID
+	gcplug.SnapName = snapName
 	gcplug.Plug = name
 	return nil
 }
 
 type ConnectionSlot struct {
-	SnapID string
-	Slot   string
+	SnapID   string
+	SnapName string
+	Slot     string
 }
 
 func (gcslot *ConnectionSlot) Empty() bool {
-	return gcslot.SnapID == "" && gcslot.Slot == ""
+	return gcslot.SnapID == "" && gcslot.SnapName == "" && gcslot.Slot == ""
 }
 
 func (gcslot *ConnectionSlot) UnmarshalYAML(unmarshal func(any) error) error {
@@ -1016,25 +1021,31 @@ func (gcslot *ConnectionSlot) UnmarshalYAML(unmarshal func(any) error) error {
 	if err := unmarshal(&s); err != nil {
 		return err
 	}
-	snapID, name, err := parseSnapIDColonName(s)
+	snapID, snapName, name, err := parseSnapRefColonName(s)
 	if err != nil {
 		return fmt.Errorf("in gadget connection slot: %v", err)
 	}
 	gcslot.SnapID = snapID
+	gcslot.SnapName = snapName
 	gcslot.Slot = name
 	return nil
 }
 
-func parseSnapIDColonName(s string) (snapID, name string, err error) {
+func parseSnapRefColonName(s string) (snapID, snapName, name string, err error) {
 	parts := strings.Split(s, ":")
 	if len(parts) == 2 {
-		snapID = parts[0]
+		snapRef := parts[0]
 		name = parts[1]
+		if snapRef == "system" || naming.ValidateSnapID(snapRef) == nil {
+			snapID = snapRef
+		} else if naming.ValidateSnap(snapRef) == nil {
+			snapName = snapRef
+		}
 	}
-	if snapID == "" || name == "" {
-		return "", "", fmt.Errorf(`expected "(<snap-id>|system):name" not %q`, s)
+	if (snapID == "" && snapName == "") || name == "" {
+		return "", "", "", fmt.Errorf(`expected "(<snap-id>|<snap-name>|system):name" not %q`, s)
 	}
-	return snapID, name, nil
+	return snapID, snapName, name, nil
 }
 
 func systemOrSnapID(s string) bool {

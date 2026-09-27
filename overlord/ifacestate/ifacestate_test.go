@@ -8783,6 +8783,68 @@ func (s *interfaceManagerSuite) TestAutoConnectGadget(c *C) {
 	checkAutoConnectGadgetTasks(c, tasks)
 }
 
+func (s *interfaceManagerSuite) TestAutoConnectGadgetSeedLocalSnapsByName(c *C) {
+	r1 := release.MockOnClassic(false)
+	defer r1()
+
+	s.mockIfaces(&ifacetest.TestInterface{InterfaceName: "test"})
+	r := assertstest.MockBuiltinBaseDeclaration([]byte(`
+type: base-declaration
+authority-id: canonical
+series: 16
+slots:
+  test:
+    deny-auto-connection: true
+`))
+	s.AddCleanup(r)
+
+	s.mockSnap(c, consumerYaml)
+	s.mockSnap(c, producerYaml)
+	gadgetInfo := s.mockSnap(c, `name: gadget
+type: gadget
+`)
+	gadgetYaml := []byte(`
+connections:
+  - plug: consumer:plug
+    slot: producer:slot
+
+volumes:
+  volume-id:
+    bootloader: grub
+`)
+	err := os.WriteFile(filepath.Join(gadgetInfo.MountDir(), "meta", "gadget.yaml"), gadgetYaml, 0644)
+	c.Assert(err, IsNil)
+
+	s.MockModel(c, nil)
+	s.state.Lock()
+	s.state.Set("seeded", nil)
+	s.state.Unlock()
+
+	s.manager(c)
+	s.state.Lock()
+	defer s.state.Unlock()
+
+	chg := s.state.NewChange("setting-up", "...")
+	t := s.state.NewTask("auto-connect", "gadget connections")
+	t.Set("snap-setup", &snapstate.SnapSetup{
+		SideInfo: &snap.SideInfo{
+			RealName: "consumer",
+			Revision: snap.R(1),
+		},
+	})
+	chg.AddTask(t)
+
+	s.state.Unlock()
+	s.se.Ensure()
+	s.se.Wait()
+	s.state.Lock()
+
+	c.Assert(chg.Err(), IsNil)
+	tasks := chg.Tasks()
+	c.Assert(tasks, HasLen, 7)
+	checkAutoConnectGadgetTasks(c, tasks)
+}
+
 func (s *interfaceManagerSuite) TestAutoConnectGadgetProducer(c *C) {
 	r1 := release.MockOnClassic(false)
 	defer r1()
@@ -9007,7 +9069,7 @@ type: gadget
 connections:
    - plug: consumeridididididididididididid:plug
      slot: produceridididididididididididid:unknown
-   - plug: unknownididididididididididididi:plug
+   - plug: unknown-snap:plug
      slot: produceridididididididididididid:slot
 
 volumes:
@@ -9045,7 +9107,7 @@ volumes:
 	logs := t.Log()
 	c.Check(logs, HasLen, 2)
 	c.Check(logs[0], Matches, `.*ignoring missing slot produceridididididididididididid:unknown`)
-	c.Check(logs[1], Matches, `.* ignoring missing plug unknownididididididididididididi:plug`)
+	c.Check(logs[1], Matches, `.* ignoring missing plug unknown-snap:plug`)
 }
 
 func (s *interfaceManagerSuite) TestAutoConnectGadgetHappyPolicyChecks(c *C) {
