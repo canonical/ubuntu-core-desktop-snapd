@@ -20,6 +20,8 @@
 package builtin_test
 
 import (
+	"strings"
+
 	. "gopkg.in/check.v1"
 
 	"github.com/snapcore/snapd/interfaces"
@@ -84,9 +86,48 @@ func (s *SystemdUserControlInterfaceSuite) TestUsedSecuritySystems(c *C) {
 	c.Assert(aasnippets["snap.other.app"], HasLen, 1)
 	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "bus=session")
 	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "bus=system")
-	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "UpdateActivationEnvironment")
-	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "member=GetUnit")
-	c.Assert(string(aasnippets["snap.other.app"][0]), testutil.Contains, "path=/org/freedesktop/systemd1/unit/**")
+	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "UpdateActivationEnvironment")
+	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "SetEnvironment")
+	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "UnsetEnvironment")
+	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "UnsetAndSetEnvironment")
+	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "member=GetUnit")
+	c.Assert(string(aasnippets["snap.other.app"][0]), Not(testutil.Contains), "path=/org/freedesktop/systemd1/unit/**")
+}
+
+func (s *SystemdUserControlInterfaceSuite) TestUnitControlIsLimitedToSessionLeader(c *C) {
+	var mockPlugSnapInfoYaml = `name: ubuntu-desktop-session
+version: 1.0
+apps:
+ ubuntu-desktop-session:
+  command: foo
+  plugs: [systemd-user-control]
+ other:
+  command: bar
+  plugs: [systemd-user-control]
+`
+	var mockSlotSnapInfoYaml = `name: core
+version: 0
+type: os
+slots:
+  systemd-user-control:
+`
+	plug, _ := MockConnectedPlug(c, mockPlugSnapInfoYaml, nil, "systemd-user-control")
+	slot, _ := MockConnectedSlot(c, mockSlotSnapInfoYaml, nil, "systemd-user-control")
+
+	appSet, err := interfaces.NewSnapAppSet(plug.Snap(), nil)
+	c.Assert(err, IsNil)
+	spec := apparmor.NewSpecification(appSet)
+	c.Assert(spec.AddConnectedPlug(s.iface, plug, slot), IsNil)
+	snippets := spec.Snippets()
+
+	leaderRules := strings.Join(snippets["snap.ubuntu-desktop-session.ubuntu-desktop-session"], "\n")
+	c.Assert(leaderRules, testutil.Contains, "member={GetUnit,StartUnit,ResetFailed}")
+	c.Assert(leaderRules, testutil.Contains, "member=PropertiesChanged")
+	c.Assert(leaderRules, Not(testutil.Contains), "UnsetAndSetEnvironment")
+
+	otherRules := strings.Join(snippets["snap.ubuntu-desktop-session.other"], "\n")
+	c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1.Manager")
+	c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1/unit/")
 }
 
 func (s *SystemdUserControlInterfaceSuite) TestInterfaces(c *C) {

@@ -19,6 +19,13 @@
 
 package builtin
 
+import (
+	"fmt"
+
+	"github.com/snapcore/snapd/interfaces"
+	"github.com/snapcore/snapd/interfaces/apparmor"
+)
+
 const systemdUserControlSummary = `allows to control the user session service manager`
 
 const systemdUserControlBaseDeclarationPlugs = `
@@ -57,81 +64,6 @@ const systemdUserControlConnectedPlugAppArmor = `
 dbus (receive, send)
     peer=(label="snap.@{SNAP_INSTANCE_NAME}.**"),
 
-# Supporting session boot fully driven by user session systemd
-# and D-Bus activation
-
-# Please note that UpdateActivationEnvironment can alter D-Bus activated services behavior
-# (e.g. by setting LD_PRELOAD)
-# It is thus intended to be restricted only to snaps acting as a desktop session on Ubuntu Core systems
-#
-# For such snaps, it allows the session to pass important variables to other processes in the session
-# (e.g. DISPLAY, WAYLAND_DISPLAY)
-dbus (send)
-    bus=session
-    path={/,/org/freedesktop/DBus}
-    interface=org.freedesktop.DBus
-    member=UpdateActivationEnvironment
-    peer=(label=unconfined),
-
-dbus (send)
-    bus=session
-    path=/org/freedesktop/systemd1
-    interface=org.freedesktop.DBus.Properties
-    member={Set,Get,GetAll}
-    peer=(label=unconfined),
-
-# Allow reading properties (e.g. ActiveState) of individual units returned
-# by GetUnit/GetUnitByPID/LoadUnit, needed by session-manager code (e.g.
-# gnome-session-init-worker) that polls unit state before/while starting
-# the graphical session
-dbus (send)
-    bus=session
-    path=/org/freedesktop/systemd1/unit/**
-    interface=org.freedesktop.DBus.Properties
-    member={Get,GetAll}
-    peer=(label=unconfined),
-
-# systemd --user (unconfined) broadcasts PropertiesChanged for every unit
-# it manages as they start/stop; session-manager/gnome-shell code that
-# subscribes to systemd unit state (e.g. to know when a
-# D-Bus/socket-activated unit becomes active) receives these regardless
-# of whether it asked about that specific unit
-dbus (receive)
-    bus=session
-    path=/org/freedesktop/systemd1/unit/**
-    interface=org.freedesktop.DBus.Properties
-    member=PropertiesChanged
-    peer=(label=unconfined),
-
-# Please note that SetEnvironment can alter existing units behavior (e.g. by setting LD_PRELOAD)
-# It is thus intended to be restricted only to snaps acting as a desktop session on Ubuntu Core systems
-#
-# For such snaps, it allows the session to pass important variables to other processes in the session
-# (e.g. DISPLAY, WAYLAND_DISPLAY)
-dbus (send)
-    bus=session
-    path=/org/freedesktop/systemd1
-    interface=org.freedesktop.systemd1.Manager
-    member={SetEnvironment,UnsetEnvironment,UnsetAndSetEnvironment}
-    peer=(label=unconfined),
-
-# Allow to introspect the units available in the session
-dbus (send)
-    bus=session
-    path=/org/freedesktop/systemd1
-    interface=org.freedesktop.systemd1.Manager
-    member={Reload,ListUnitFiles,ListUnitFilesByPatterns}
-    peer=(label=unconfined),
-
-# Allow to manage the units available in the session
-# (e.g. to start the target describing the full session, phase parts of the startup)
-dbus (send)
-    bus=session
-    path=/org/freedesktop/systemd1
-    interface=org.freedesktop.systemd1.Manager
-    member={ResetFailed,Reload,StartUnit,StopUnit,RestartUnit,Subscribe}
-    peer=(label=unconfined),
-
 # Allow common name-resolution calls on the session/system bus daemon
 # itself, used pervasively by GLib/GDBus (e.g. GDBusProxy) when talking
 # to any well-known D-Bus name
@@ -150,17 +82,6 @@ dbus (send)
     path=/
     interface=org.freedesktop.DBus
     member=ListNames
-    peer=(label=unconfined),
-
-# Allow looking up a unit's object path by name (e.g. to then read its
-# ActiveState property via the Properties.Get rule above), needed by
-# session-manager code (e.g. gnome-session-init-worker) to check whether
-# graphical-session.target is already active before (re-)starting it
-dbus (send)
-    bus=session
-    path=/org/freedesktop/systemd1
-    interface=org.freedesktop.systemd1.Manager
-    member=GetUnit
     peer=(label=unconfined),
 
 # The following rules cover additional access needed by the session
@@ -284,8 +205,55 @@ dbus (receive)
     peer=(label=unconfined),
 `
 
+const systemdUserControlSessionManagerAppArmor = `
+    # Only the systemd-backed GNOME Session leader directly controls user units.
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1
+        interface=org.freedesktop.systemd1.Manager
+        member={GetUnit,StartUnit,ResetFailed}
+        peer=(label=unconfined),
+
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1/unit/**
+        interface=org.freedesktop.DBus.Properties
+        member={Get,GetAll}
+        peer=(label=unconfined),
+
+    dbus (receive)
+        bus=session
+        path=/org/freedesktop/systemd1/unit/**
+        interface=org.freedesktop.DBus.Properties
+        member=PropertiesChanged
+        peer=(label=unconfined),
+    `
+
+type systemdUserControlInterface struct {
+	commonInterface
+}
+
+func (iface *systemdUserControlInterface) AppArmorConnectedPlug(
+	spec *apparmor.Specification,
+	plug *interfaces.ConnectedPlug,
+	slot *interfaces.ConnectedSlot,
+) error {
+	if err := iface.commonInterface.AppArmorConnectedPlug(spec, plug, slot); err != nil {
+		return err
+	}
+
+	targetTag := fmt.Sprintf("snap.%s.ubuntu-desktop-session", plug.Snap().InstanceName())
+	for _, runnable := range plug.Runnables() {
+		if runnable.SecurityTag == targetTag {
+			spec.AddSnippetForTag(targetTag, systemdUserControlSessionManagerAppArmor)
+			break
+		}
+	}
+	return nil
+}
+
 func init() {
-	registerIface(&commonInterface{
+	registerIface(&systemdUserControlInterface{commonInterface{
 		name:                  "systemd-user-control",
 		summary:               systemdUserControlSummary,
 		implicitOnCore:        true,
@@ -293,5 +261,5 @@ func init() {
 		baseDeclarationPlugs:  systemdUserControlBaseDeclarationPlugs,
 		baseDeclarationSlots:  systemdUserControlBaseDeclarationSlots,
 		connectedPlugAppArmor: systemdUserControlConnectedPlugAppArmor,
-	})
+	}})
 }

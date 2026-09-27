@@ -303,6 +303,27 @@ func (spec *Specification) AddSnippet(snippet string) {
 	}
 }
 
+// AddSnippetForTag adds a snippet to one application or hook using the
+// interface, if the security tag is in the current scope.
+func (spec *Specification) AddSnippetForTag(tag, snippet string) bool {
+	inScope := false
+	for _, scopedTag := range spec.securityTags {
+		if scopedTag == tag {
+			inScope = true
+			break
+		}
+	}
+	if !inScope {
+		return false
+	}
+	if spec.snippets == nil {
+		spec.snippets = make(map[string][]string)
+	}
+	spec.snippets[tag] = append(spec.snippets[tag], snippet)
+	sort.Strings(spec.snippets[tag])
+	return true
+}
+
 // AddPrioritizedSnippet adds a new apparmor snippet to all applications and hooks using the interface,
 // but identified with a key and a priority. If no other snippet exists with that key, the snippet is
 // added like with AddSnippet, but if there is already another snippet with that key, the priority of
