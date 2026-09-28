@@ -112,6 +112,8 @@ func (s *DesktopInterfaceSuite) TestAppArmorSpec(c *C) {
 	c.Assert(spec.SecurityTags(), DeepEquals, []string{"snap.consumer.app"})
 	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "# Description: Can access basic graphical desktop resources")
 	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "#include <abstractions/fonts>")
+	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"interface=org.freedesktop.portal.*\n    path=/org/freedesktop/portal/{desktop,documents}{,/**}\n    peer=(label=\"snap.provider.app\"),\n")
 
 	// check desktop interface uses correct label for Mutter when provided
 	// by a snap
@@ -131,6 +133,11 @@ func (s *DesktopInterfaceSuite) TestAppArmorSpec(c *C) {
 	c.Assert(spec.SecurityTags(), DeepEquals, []string{"snap.provider.app"})
 	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains, "# Description: Can provide various desktop services")
 	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains, "interface=org.freedesktop.impl.portal.*")
+	c.Assert(spec.AddConnectedSlot(s.iface, s.plug, s.appSlot), IsNil)
+	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains,
+		"interface=org.freedesktop.portal.*\n    path=/org/freedesktop/portal/{desktop,documents}{,/**}\n    peer=(label=\"snap.consumer.app\"),\n")
+	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains,
+		"interface=org.freedesktop.host.portal.Registry\n    member=Register\n    peer=(label=\"snap.consumer.app\"),\n")
 
 	// On a classic system, additional permissions are granted
 	restore = release.MockOnClassic(true)
@@ -144,6 +151,8 @@ func (s *DesktopInterfaceSuite) TestAppArmorSpec(c *C) {
 	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "# Description: Can access basic graphical desktop resources")
 	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "/etc/gtk-3.0/settings.ini r,")
 	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "# Allow access to xdg-desktop-portal and xdg-document-portal")
+	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"interface=org.freedesktop.portal.*\n    path=/org/freedesktop/portal/{desktop,documents}{,/**}\n    peer=(label=unconfined),\n")
 
 	// check desktop interface uses correct label for Mutter when provided
 	// by the system

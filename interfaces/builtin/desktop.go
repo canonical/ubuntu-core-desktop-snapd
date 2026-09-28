@@ -107,24 +107,33 @@ owner /run/user/[0-9]*/doc/{,*/} r,
 # the user guided the access and can specify anything DAC allows.
 /run/user/[0-9]*/doc/*/** rw,
 
-# Allow access to xdg-desktop-portal and xdg-document-portal
+# Allow access to xdg-desktop-portal and xdg-document-portal, whether
+# provided by the system or by the connected desktop slot.
 dbus (receive, send)
     bus=session
     interface=org.freedesktop.portal.*
     path=/org/freedesktop/portal/{desktop,documents}{,/**}
-    peer=(label=unconfined),
+    peer=(label=###SLOT_SECURITY_TAGS###),
 
 dbus (receive, send)
     bus=session
     interface=org.freedesktop.DBus.Properties
     path=/org/freedesktop/portal/{desktop,documents}{,/**}
-    peer=(label=unconfined),
+    peer=(label=###SLOT_SECURITY_TAGS###),
 
 dbus (receive, send)
     bus=session
     interface=org.freedesktop.DBus.Introspectable
     path=/org/freedesktop/portal/{desktop,documents}{,/**}
-    peer=(label=unconfined),
+    peer=(label=###SLOT_SECURITY_TAGS###),
+
+# Snap Store registers its portal integration metadata with the frontend.
+dbus (receive, send)
+    bus=session
+    path=/org/freedesktop/portal/desktop
+    interface=org.freedesktop.host.portal.Registry
+    member=Register
+    peer=(label=###SLOT_SECURITY_TAGS###),
 
 # The portals service is normally running and newer versions of
 # xdg-desktop-portal include AssumedAppArmor=unconfined. Since older
@@ -461,6 +470,29 @@ dbus (send, receive)
 `
 
 const desktopConnectedSlotAppArmor = `
+# Allow connected desktop clients to use the portal APIs provided by this slot.
+dbus (receive, send)
+    bus=session
+    interface=org.freedesktop.portal.*
+    path=/org/freedesktop/portal/{desktop,documents}{,/**}
+    peer=(label=###PLUG_SECURITY_TAGS###),
+dbus (receive, send)
+    bus=session
+    interface=org.freedesktop.DBus.Properties
+    path=/org/freedesktop/portal/{desktop,documents}{,/**}
+    peer=(label=###PLUG_SECURITY_TAGS###),
+dbus (receive, send)
+    bus=session
+    interface=org.freedesktop.DBus.Introspectable
+    path=/org/freedesktop/portal/{desktop,documents}{,/**}
+    peer=(label=###PLUG_SECURITY_TAGS###),
+dbus (receive, send)
+    bus=session
+    path=/org/freedesktop/portal/desktop
+    interface=org.freedesktop.host.portal.Registry
+    member=Register
+    peer=(label=###PLUG_SECURITY_TAGS###),
+
 # Allow to receive updates from applications to the desktop session about ongoing jobs
 # (for progress display in the task list)
 dbus (receive)
