@@ -261,6 +261,9 @@ type StaticInfo struct {
 
 	// ImplicitOnCore controls if a slot is automatically added to core (non-classic) systems.
 	ImplicitOnCore bool
+	// ImplicitOnCoreDangerous controls if a slot is automatically added to Core systems
+	// whose model grade is dangerous.
+	ImplicitOnCoreDangerous bool
 	// ImplicitOnClassic controls if a slot is automatically added to classic systems.
 	ImplicitOnClassic bool
 

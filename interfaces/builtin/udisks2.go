@@ -411,9 +411,11 @@ func (iface *udisks2Interface) Name() string {
 
 func (iface *udisks2Interface) StaticInfo() interfaces.StaticInfo {
 	return interfaces.StaticInfo{
-		Summary:              udisks2Summary,
-		ImplicitOnClassic:    true,
-		BaseDeclarationSlots: udisks2BaseDeclarationSlots,
+		Summary: udisks2Summary,
+		// Dangerous Core models can explicitly connect the confined file-manager monitor.
+		ImplicitOnCoreDangerous: true,
+		ImplicitOnClassic:       true,
+		BaseDeclarationSlots:    udisks2BaseDeclarationSlots,
 	}
 }
 

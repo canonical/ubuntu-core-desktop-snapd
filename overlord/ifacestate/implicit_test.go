@@ -22,7 +22,10 @@ package ifacestate_test
 import (
 	. "gopkg.in/check.v1"
 
+	"github.com/snapcore/snapd/asserts"
+	"github.com/snapcore/snapd/asserts/assertstest"
 	"github.com/snapcore/snapd/overlord/ifacestate"
+	"github.com/snapcore/snapd/overlord/snapstate/snapstatetest"
 	"github.com/snapcore/snapd/overlord/state"
 	"github.com/snapcore/snapd/release"
 	"github.com/snapcore/snapd/snap"
@@ -33,9 +36,43 @@ type implicitSuite struct{}
 
 var _ = Suite(&implicitSuite{})
 
+func coreModelWithGrade(grade asserts.ModelGrade) *asserts.Model {
+	headers := map[string]any{
+		"type":         "model",
+		"authority-id": "brand",
+		"series":       "16",
+		"brand-id":     "brand",
+		"model":        "core-model",
+		"base":         "core20",
+		"architecture": "amd64",
+		"timestamp":    "2026-09-28T00:00:00Z",
+	}
+	if grade == asserts.ModelGradeUnset {
+		headers["gadget"] = "gadget"
+		headers["kernel"] = "kernel"
+	} else {
+		headers["grade"] = string(grade)
+		headers["snaps"] = []any{
+			map[string]any{
+				"name": "kernel",
+				"id":   "bazlinuxidididididididididididid",
+				"type": "kernel",
+			},
+			map[string]any{
+				"name": "gadget",
+				"id":   "brandgadgetdidididididididididid",
+				"type": "gadget",
+			},
+		}
+	}
+	return assertstest.FakeAssertion(headers, nil).(*asserts.Model)
+}
+
 func (implicitSuite) TestAddImplicitInterfacesOnCore(c *C) {
 	restore := release.MockOnClassic(false)
 	defer restore()
+	restoreModel := snapstatetest.MockDeviceModel(coreModelWithGrade(asserts.ModelSigned))
+	defer restoreModel()
 
 	st := state.New(nil)
 	hotplugSlots := map[string]*ifacestate.HotplugSlotInfo{
@@ -63,6 +100,7 @@ func (implicitSuite) TestAddImplicitInterfacesOnCore(c *C) {
 	for _, name := range []string{"unity7"} {
 		c.Assert(info.Slots[name], IsNil)
 	}
+	c.Assert(info.Slots["udisks2"], IsNil)
 
 	// Ensure that we have *some* implicit slots
 	c.Assert(len(info.Slots) > 10, Equals, true)
@@ -87,7 +125,7 @@ func (implicitSuite) TestAddImplicitInterfacesOnClassic(c *C) {
 
 	c.Assert(ifacestate.AddImplicitInterfaces(st, info), IsNil)
 	// Ensure that some slots that exist in classic systems are present.
-	for _, name := range []string{"network", "unity7"} {
+	for _, name := range []string{"network", "unity7", "udisks2"} {
 		slot := info.Slots[name]
 		c.Assert(slot.Interface, Equals, name)
 		c.Assert(slot.Name, Equals, name)
@@ -102,6 +140,37 @@ func (implicitSuite) TestAddImplicitInterfacesOnClassic(c *C) {
 	}
 	// Ensure that we have *some* implicit slots
 	c.Assert(len(info.Slots) > 10, Equals, true)
+}
+
+func (implicitSuite) TestAddUDisks2SlotOnlyOnDangerousCore(c *C) {
+	restore := release.MockOnClassic(false)
+	defer restore()
+
+	for _, tc := range []struct {
+		grade   asserts.ModelGrade
+		present bool
+	}{
+		{grade: asserts.ModelDangerous, present: true},
+		{grade: asserts.ModelSigned},
+		{grade: asserts.ModelSecured},
+		{grade: asserts.ModelGradeUnset},
+	} {
+		restoreModel := snapstatetest.MockDeviceModel(coreModelWithGrade(tc.grade))
+
+		info := snaptest.MockInfo(c, "{name: core, type: os, version: 0}", nil)
+		st := state.New(nil)
+		st.Lock()
+		err := ifacestate.AddImplicitInterfaces(st, info)
+		st.Unlock()
+		c.Assert(err, IsNil)
+		if tc.present {
+			c.Assert(info.Slots["udisks2"], NotNil)
+		} else {
+			c.Assert(info.Slots["udisks2"], IsNil)
+		}
+
+		restoreModel()
+	}
 }
 
 func (implicitSuite) TestAddImplicitSlotsErrorSlotExists(c *C) {

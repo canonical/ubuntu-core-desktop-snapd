@@ -20,10 +20,13 @@
 package ifacestate
 
 import (
+	"errors"
 	"fmt"
 
+	"github.com/snapcore/snapd/asserts"
 	"github.com/snapcore/snapd/interfaces"
 	"github.com/snapcore/snapd/interfaces/builtin"
+	"github.com/snapcore/snapd/overlord/snapstate"
 	"github.com/snapcore/snapd/overlord/state"
 	"github.com/snapcore/snapd/release"
 	"github.com/snapcore/snapd/snap"
@@ -60,10 +63,24 @@ func addImplicitInterfaces(st *state.State, snapInfo *snap.Info) error {
 		return err
 	}
 
+	dangerousModel := false
+	if !release.OnClassic {
+		for _, iface := range builtin.Interfaces() {
+			if interfaces.StaticInfoOf(iface).ImplicitOnCoreDangerous {
+				dangerousModel, err = coreModelIsDangerous(st)
+				if err != nil {
+					return err
+				}
+				break
+			}
+		}
+	}
+
 	// Ask each slot/plug if it wants to be implicitly added.
 	for _, iface := range builtin.Interfaces() {
 		si := interfaces.StaticInfoOf(iface)
-		if (release.OnClassic && si.ImplicitOnClassic) || (!release.OnClassic && si.ImplicitOnCore) {
+		implicitOnCore := si.ImplicitOnCore || (si.ImplicitOnCoreDangerous && dangerousModel)
+		if (release.OnClassic && si.ImplicitOnClassic) || (!release.OnClassic && implicitOnCore) {
 			ifaceName := iface.Name()
 			if _, ok := snapInfo.Slots[ifaceName]; !ok {
 				snapInfo.Slots[ifaceName] = makeImplicitSlot(snapInfo, ifaceName)
@@ -95,6 +112,20 @@ func addImplicitInterfaces(st *state.State, snapInfo *snap.Info) error {
 	}
 
 	return nil
+}
+
+func coreModelIsDangerous(st *state.State) (bool, error) {
+	if snapstate.DeviceCtx == nil {
+		return false, nil
+	}
+	deviceCtx, err := snapstate.DeviceCtx(st, nil, nil)
+	if errors.Is(err, state.ErrNoState) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return deviceCtx != nil && deviceCtx.Model() != nil && deviceCtx.Model().Grade() == asserts.ModelDangerous, nil
 }
 
 func makeImplicitSlot(snapInfo *snap.Info, ifaceName string) *snap.SlotInfo {

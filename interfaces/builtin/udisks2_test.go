@@ -355,9 +355,11 @@ func (s *UDisks2InterfaceSuite) TestSecCompSpecOnClassic(c *C) {
 func (s *UDisks2InterfaceSuite) TestStaticInfo(c *C) {
 	si := interfaces.StaticInfoOf(s.iface)
 	c.Assert(si.ImplicitOnCore, Equals, false)
+	c.Assert(si.ImplicitOnCoreDangerous, Equals, true)
 	c.Assert(si.ImplicitOnClassic, Equals, true)
 	c.Assert(si.Summary, Equals, `allows operating as or interacting with the UDisks2 service`)
 	c.Assert(si.BaseDeclarationSlots, testutil.Contains, "udisks2")
+	c.Assert(si.BaseDeclarationSlots, testutil.Contains, "deny-auto-connection: true")
 }
 
 func (s *UDisks2InterfaceSuite) TestAutoConnect(c *C) {
