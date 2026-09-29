@@ -59,6 +59,14 @@ shmctl
 const pipewirePermanentSlotAppArmor = `
 owner @{PROC}/@{pid}/exe r,
 
+# The portal module uses this PID to mark portal-created PipeWire clients.
+dbus (send)
+    bus=session
+    path=/org/freedesktop/DBus
+    interface=org.freedesktop.DBus
+    member=GetConnectionUnixProcessID
+    peer=(name=org.freedesktop.DBus, label=unconfined),
+
 # For udev
 network netlink raw,
 /sys/devices/virtual/dmi/id/sys_vendor r,
