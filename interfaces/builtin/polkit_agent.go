@@ -98,6 +98,9 @@ dbus (receive, send)
     member={Get,GetAll,PropertiesChanged}
     peer=(label=unconfined),
 
+# Allow polkit 127's systemd socket-activated helper, which avoids SUID.
+/run/polkit/agent-helper.socket rw,
+
 # Allow agent to execute the setuid polkit-agent-helper-1 in a subprofile
 /usr/lib{exec,/polkit-1}/polkit-agent-helper-1 Cxr -> polkit_agent_helper,
 

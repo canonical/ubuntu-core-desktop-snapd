@@ -81,6 +81,7 @@ func (s *PolkitAgentSuite) TestAppArmor(c *C) {
 	c.Assert(spec.SecurityTags(), DeepEquals, []string{"snap.consumer.app"})
 	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "interface=org.freedesktop.PolicyKit1.Authority")
 	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "interface=org.freedesktop.PolicyKit1.AuthenticationAgent")
+	c.Check(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "/run/polkit/agent-helper.socket rw,")
 
 	appSet, err = interfaces.NewSnapAppSet(s.plugInfo.Snap, nil)
 	c.Assert(err, IsNil)
