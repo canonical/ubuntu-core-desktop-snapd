@@ -583,14 +583,26 @@ dbus (send)
     bus=system
     path=/org/gnome/DisplayManager/Manager
     interface=org.gnome.DisplayManager.Manager
-    member={RegisterSession,OpenReauthenticationChannel}
+    member={RegisterSession,RegisterDisplay,OpenReauthenticationChannel}
     peer=(label=unconfined),
+dbus (send)
+    bus=system
+    path=/org/gnome/DisplayManager/Manager
+    interface=org.gnome.DisplayManager.Manager
+    member={RegisterSession,RegisterDisplay,OpenReauthenticationChannel}
+    peer=(label=gdm),
 dbus (send)
     bus=system
     path=/org/gnome/DisplayManager/Manager
     interface=org.freedesktop.DBus.Properties
     member="Get{,All}"
     peer=(label=unconfined),
+dbus (send)
+    bus=system
+    path=/org/gnome/DisplayManager/Manager
+    interface=org.freedesktop.DBus.Properties
+    member="Get{,All}"
+    peer=(label=gdm),
 
 # Allow access to GDM's private reauthentication channel socket
 /run/gdm3/dbus/dbus-* rw,

@@ -133,6 +133,10 @@ func (s *DesktopInterfaceSuite) TestAppArmorSpec(c *C) {
 	c.Assert(spec.SecurityTags(), DeepEquals, []string{"snap.provider.app"})
 	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains, "# Description: Can provide various desktop services")
 	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains, "interface=org.freedesktop.impl.portal.*")
+	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains,
+		"member={RegisterSession,RegisterDisplay,OpenReauthenticationChannel}\n    peer=(label=gdm),\n")
+	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains,
+		"member=\"Get{,All}\"\n    peer=(label=gdm),\n")
 	c.Assert(spec.AddConnectedSlot(s.iface, s.plug, s.appSlot), IsNil)
 	c.Check(spec.SnippetForTag("snap.provider.app"), testutil.Contains,
 		"interface=org.freedesktop.portal.*\n    path=/org/freedesktop/portal/{desktop,documents}{,/**}\n    peer=(label=\"snap.consumer.app\"),\n")
