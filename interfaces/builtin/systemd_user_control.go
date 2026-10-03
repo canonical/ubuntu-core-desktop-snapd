@@ -229,6 +229,24 @@ const systemdUserControlSessionManagerAppArmor = `
         peer=(label=unconfined),
     `
 
+const systemdUserControlGnomeSessionManagerAppArmor = `
+    # GNOME Session publishes its activation and systemd environments
+    # before starting D-Bus-activated and systemd-managed applications.
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/DBus
+        interface=org.freedesktop.DBus
+        member=UpdateActivationEnvironment
+        peer=(label=unconfined),
+
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1
+        interface=org.freedesktop.systemd1.Manager
+        member=UnsetAndSetEnvironment
+        peer=(label=unconfined),
+    `
+
 const systemdUserControlPlasmaSessionAppArmor = `
     # startplasma-wayland also refreshes the systemd user manager's unit
     # cache and activation environment before starting the Plasma session.
@@ -279,15 +297,19 @@ func (iface *systemdUserControlInterface) AppArmorConnectedPlug(
 	}
 
 	instanceName := plug.Snap().InstanceName()
+	gnomeSessionManagerTag := fmt.Sprintf("snap.%s.ubuntu-desktop-session", instanceName)
 	plasmaSessionManagerTag := fmt.Sprintf("snap.%s.plasma-desktop-session", instanceName)
 	plasmaKWinTag := fmt.Sprintf("snap.%s.plasma-kwin-wayland", instanceName)
 	sessionManagerTags := map[string]struct{}{
-		fmt.Sprintf("snap.%s.ubuntu-desktop-session", instanceName): {},
+		gnomeSessionManagerTag: {},
 		plasmaSessionManagerTag: {},
 	}
 	for _, runnable := range plug.Runnables() {
 		if _, ok := sessionManagerTags[runnable.SecurityTag]; ok {
 			spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlSessionManagerAppArmor)
+			if runnable.SecurityTag == gnomeSessionManagerTag {
+				spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlGnomeSessionManagerAppArmor)
+			}
 			if runnable.SecurityTag == plasmaSessionManagerTag {
 				spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlPlasmaSessionAppArmor)
 			}
