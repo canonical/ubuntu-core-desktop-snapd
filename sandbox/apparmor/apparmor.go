@@ -45,6 +45,10 @@ var (
 	osutilAtomicWrite = osutil.AtomicWrite
 )
 
+// SnapdHomedirsTunablePath is the writable include used for configured home
+// directories on Ubuntu Core.
+const SnapdHomedirsTunablePath = "/var/lib/snapd/apparmor/home-dirs"
+
 // ValidateNoAppArmorRegexp will check that the given string does not
 // contain AppArmor regular expressions (AARE), double quotes or \0.
 // Note that to check the inverse of this, that is that a string has
@@ -1008,13 +1012,25 @@ func tryAppArmorParserFeature(cmd *exec.Cmd, flags []string, rule string) error 
 func UpdateHomedirsTunable(homedirs []string) error {
 	homeTunableDir := filepath.Join(ConfDir, "tunables/home.d")
 	tunableFilePath := filepath.Join(homeTunableDir, "snapd")
+	core := dirs.WritableMountPath != dirs.GlobalRootDir
+	if core {
+		tunableFilePath = filepath.Join(dirs.GlobalRootDir, strings.TrimPrefix(SnapdHomedirsTunablePath, "/"))
+		homeTunableDir = filepath.Dir(tunableFilePath)
+	}
 
-	// If the file is not there and `homedirs` is empty, do nothing; this is
-	// not just an optimisation, but a necessity in Ubuntu Core: the
-	// /etc/apparmor.d/ tree is read-only, and attempting to create the file
-	// would generate an error.
+	// If the file is not there and `homedirs` is empty, there is nothing to do.
 	if len(homedirs) == 0 && !osutil.FileExists(tunableFilePath) {
 		return nil
+	}
+
+	if core && len(homedirs) > 0 {
+		features, err := ParserFeatures()
+		if err != nil {
+			return fmt.Errorf("cannot determine AppArmor parser features: %v", err)
+		}
+		if !strutil.ListContains(features, "include-if-exists") {
+			return errors.New("AppArmor parser does not support include-if-exists, required for non-standard home directories on Ubuntu Core")
+		}
 	}
 
 	if err := osMkdirAll(homeTunableDir, 0755); err != nil {
@@ -1028,6 +1044,15 @@ func UpdateHomedirsTunable(homedirs []string) error {
 		separator := ""
 		for _, dir := range homedirs {
 			fmt.Fprintf(contents, `%s"%s"`, separator, dir)
+			separator = " "
+		}
+		contents.Write([]byte("\n"))
+	}
+	if core && len(homedirs) > 0 {
+		contents.Write([]byte("@{HOME}+="))
+		separator := ""
+		for _, dir := range homedirs {
+			fmt.Fprintf(contents, `%s"%s/*/"`, separator, strings.TrimRight(dir, "/"))
 			separator = " "
 		}
 		contents.Write([]byte("\n"))

@@ -31,7 +31,6 @@ import (
 	"github.com/snapcore/snapd/osutil"
 	"github.com/snapcore/snapd/overlord/configstate/configcore"
 	"github.com/snapcore/snapd/sandbox/apparmor"
-	"github.com/snapcore/snapd/testutil"
 )
 
 type homedirsSuite struct {
@@ -272,7 +271,7 @@ func (s *homedirsSuite) TestConfigureHomedirsEmptyHappy(c *C) {
 	c.Check(passedHomeDirs, HasLen, 0)
 }
 
-func (s *homedirsSuite) TestConfigureHomedirsNotOnCore(c *C) {
+func (s *homedirsSuite) TestConfigureHomedirsOnCore(c *C) {
 	reloadProfilesCallCount := 0
 	restore := configcore.MockApparmorReloadAllSnapProfiles(func() error {
 		reloadProfilesCallCount++
@@ -300,15 +299,17 @@ func (s *homedirsSuite) TestConfigureHomedirsNotOnCore(c *C) {
 			"homedirs": "/home/existingDir",
 		},
 	})
-	c.Check(err, ErrorMatches, `configuration of homedir locations on Ubuntu Core is currently unsupported. Please report a bug if you need it`)
+	c.Assert(err, IsNil)
 
-	// Verify config file doesn't exist
-	c.Check(dirs.SnapSystemParamsUnder(dirs.GlobalRootDir), testutil.FileAbsent)
+	configPath := dirs.SnapSystemParamsUnder(dirs.GlobalRootDir)
+	contents, err := os.ReadFile(configPath)
+	c.Assert(err, IsNil)
+	c.Check(string(contents), Equals, "homedirs=/home/existingDir\n")
 
-	// And that nothing happened.
-	c.Check(tunableHomedirs, HasLen, 0)
-	c.Check(reloadProfilesCallCount, Equals, 0)
-	c.Check(setupSnapConfineSnippetsCalls, Equals, 0)
+	c.Check(tunableHomedirs, DeepEquals, []string{filepath.Join(dirs.GlobalRootDir, "/home/existingDir"),
+		filepath.Join(dirs.GlobalRootDir, "/home")})
+	c.Check(reloadProfilesCallCount, Equals, 1)
+	c.Check(setupSnapConfineSnippetsCalls, Equals, 1)
 }
 
 func (s *homedirsSuite) TestupdateHomedirsConfig(c *C) {

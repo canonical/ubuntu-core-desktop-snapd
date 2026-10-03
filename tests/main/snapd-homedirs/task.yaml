@@ -6,7 +6,6 @@ details: |
     snap data in non-standard home directories is deleted when the snap package is removed.
 
 systems:
-    - -ubuntu-core-*  # Home dirs cannot be changed
     - -centos-*       # No AppArmor support
     - -fedora-*       # No AppArmor support
     - -amazon-linux-* # No AppArmor support
@@ -17,13 +16,13 @@ environment:
 
 prepare: |
     # Create a new user in a non-standard location
-    mkdir -p /remote/users
-    useradd -b /remote/users -m -U "$USERNAME"
+    mkdir -p /run/remote/users
+    useradd -b /run/remote/users -m -U "$USERNAME"
     snap install test-snapd-sh
 
 restore: |
     userdel -f --remove "$USERNAME"
-    rm -rf /remote/users
+    rm -rf /run/remote/users
 
 debug: |
     # output custom snap-confine snippets
@@ -43,14 +42,19 @@ execute: |
     fi
     rm -f stderr.log
 
-    echo "Enable the home directories under /remote/users"
-    snap set system homedirs=/remote/users
+    echo "Enable the home directories under /run/remote/users"
+    snap set system homedirs=/run/remote/users
 
     echo "Verify that the system-params file has been created"
-    MATCH "^homedirs=/remote/users$" < /var/lib/snapd/system-params
+    MATCH "^homedirs=/run/remote/users$" < /var/lib/snapd/system-params
 
     echo "And that the AppArmor tunable file is proper"
-    MATCH "^@{HOMEDIRS}\\+=\"/remote/users\" \"/home\"$" < /etc/apparmor.d/tunables/home.d/snapd
+    if [ -e /etc/apparmor.d/tunables/home.d/snapd ]; then
+        MATCH "^@{HOMEDIRS}\\+=\"/run/remote/users\" \"/home\"$" < /etc/apparmor.d/tunables/home.d/snapd
+    else
+        MATCH "^@{HOMEDIRS}\\+=\"/run/remote/users\" \"/home\"$" < /var/lib/snapd/apparmor/home-dirs
+        MATCH "^@{HOME}\\+=\"/run/remote/users/\\*/\" \"/home/\\*/\"$" < /var/lib/snapd/apparmor/home-dirs
+    fi
 
     echo "Invoke the test app again (should now work)"
     sudo -u "$USERNAME" -i test-snapd-sh.sh -c "echo Hello world" | MATCH "Hello world"
@@ -64,7 +68,7 @@ execute: |
     # Get the revison of the snap
     rev=$(snap list test-snapd-sh|tail -n1|tr -s ' '|cut -f3 -d' ')
 
-    homes=("/root/" "/home/test/" "/remote/users/$USERNAME/")
+    homes=("/root/" "/home/test/" "/run/remote/users/$USERNAME/")
     echo "That has some user data"
     for h in "${homes[@]}"; do
         test -d "$h"

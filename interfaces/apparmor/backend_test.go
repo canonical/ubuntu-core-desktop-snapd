@@ -307,6 +307,20 @@ func (s *backendSuite) TestInstallingSnapWritesAndLoadsProfiles(c *C) {
 	})
 }
 
+func (s *backendSuite) TestInstallingSnapIncludesHomedirsTunable(c *C) {
+	restore := apparmor.MockParserFeatures(func() ([]string, error) {
+		return []string{"include-if-exists"}, nil
+	})
+	defer restore()
+
+	s.InstallSnap(c, interfaces.ConfinementOptions{}, "", ifacetest.SambaYamlV1, 1)
+	profile := filepath.Join(dirs.SnapAppArmorDir, "snap.samba.smbd")
+	updateNSProfile := filepath.Join(dirs.SnapAppArmorDir, "snap-update-ns.samba")
+	include := `#include if exists "` + apparmor_sandbox.SnapdHomedirsTunablePath + `"`
+	c.Assert(profile, testutil.FileContains, include)
+	c.Assert(updateNSProfile, testutil.FileContains, include)
+}
+
 func (s *backendSuite) TestInstallingSnapWithHookWritesAndLoadsProfiles(c *C) {
 	s.InstallSnap(c, interfaces.ConfinementOptions{}, "", ifacetest.HookYaml, 1)
 	profile := filepath.Join(dirs.SnapAppArmorDir, "snap.foo.hook.configure")

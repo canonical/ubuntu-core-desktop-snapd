@@ -723,6 +723,12 @@ func addUpdateNSProfile(snapInfo *snap.Info, snippets string, content map[string
 				return `#include if exists "/etc/apparmor.d/tunables/home.d"`
 			}
 			return ""
+		case "###INCLUDE_IF_EXISTS_SNAPD_HOMEDIRS_TUNABLE###":
+			features, _ := parserFeatures()
+			if strutil.ListContains(features, "include-if-exists") {
+				return `#include if exists "` + apparmor_sandbox.SnapdHomedirsTunablePath + `"`
+			}
+			return ""
 		default:
 			if snapdenv.Testing() || osutil.IsTestBinary() {
 				panic(fmt.Sprintf("cannot expand snippet for pattern %q", placeholder))
@@ -928,6 +934,12 @@ func (b *Backend) addContent(securityTag string, snapInfo *snap.Info, cmdName st
 			features, _ := parserFeatures()
 			if strutil.ListContains(features, "snapd-internal") {
 				return `#include if exists "/etc/apparmor.d/tunables/home.d"`
+			}
+			return ""
+		case "###INCLUDE_IF_EXISTS_SNAPD_HOMEDIRS_TUNABLE###":
+			features, _ := parserFeatures()
+			if strutil.ListContains(features, "include-if-exists") {
+				return `#include if exists "` + apparmor_sandbox.SnapdHomedirsTunablePath + `"`
 			}
 			return ""
 		case "###VAR###":

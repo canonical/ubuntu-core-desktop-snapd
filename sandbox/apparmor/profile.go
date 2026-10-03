@@ -252,6 +252,8 @@ func snapConfineHomedirsSnippet(homedirs []string) string {
 		for path := trimmedHomedir; path != "/"; path = filepath.Dir(path) {
 			builder.WriteString(fmt.Sprintf("\"%s/\" rw,\n", path))
 		}
+		builder.WriteString(fmt.Sprintf("\"%s/*/\" rw,\n", trimmedHomedir))
+		builder.WriteString(fmt.Sprintf("\"%s/*/snap/{,*/,*/*/}\" rw,\n", trimmedHomedir))
 		bindPath := path.Join("/tmp", "snap-private-tmp", "snap.rootfs_*", trimmedHomedir)
 		builder.WriteString(fmt.Sprintf("mount options=(rw rbind) \"%s/\" -> \"%s/\",\n\n", trimmedHomedir, bindPath))
 	}
