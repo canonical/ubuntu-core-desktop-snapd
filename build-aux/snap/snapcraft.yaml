@@ -43,6 +43,23 @@ confinement: strict
 #   where the snapd snap recipe is named snapd-fips
 #
 parts:
+  # The build-base (core22) ships libseccomp 2.5.3, which does not know
+  # syscalls added since 2022 (e.g. lsm_get_self_attr/lsm_set_self_attr,
+  # used by libapparmor 4.x for label queries). snap-seccomp silently
+  # drops template entries its libseccomp cannot resolve, so generated
+  # filters would deny those syscalls with EPERM - which breaks callers
+  # that only fall back to /proc attr reads on ENOSYS. Stage a current
+  # libseccomp runtime instead; the build still links against the
+  # build-env's ABI-compatible libseccomp.
+  libseccomp:
+    plugin: autotools
+    source: https://github.com/seccomp/libseccomp/releases/download/v2.6.0/libseccomp-2.6.0.tar.gz
+    autotools-configure-parameters: ["--prefix=/usr"]
+    build-packages:
+      - gperf
+    prime:
+      - usr/lib/libseccomp.so.2*
+      - usr/lib/*/libseccomp.so.2*
   dynamic-linker:
     plugin: nil
     build-packages:
@@ -105,7 +122,6 @@ parts:
       - liblz4-1
       - liblzma5
       - liblzo2-2
-      - libseccomp2
       - libudev1
       - libzstd1
       - xdelta3
