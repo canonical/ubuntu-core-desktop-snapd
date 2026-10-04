@@ -104,6 +104,16 @@ capability sys_nice,
 capability sys_resource,
 
 owner @{PROC}/@{pid}/exe r,
+
+# The snap audio-permission delegation (Ubuntu's pipewire snap-policy) reads
+# the server's own AppArmor label and connected clients' labels to query
+# per-client audio permissions from snapd. libapparmor prefers the LSM
+# syscalls (allowed via seccomp) and falls back to reading /proc attr files,
+# where reading a client's label is mediated as a ptrace read.
+owner @{PROC}/@{pid}/attr/{apparmor/,}current r,
+ptrace (read) peer=snap.**,
+ptrace (read) peer=unconfined,
+
 /etc/machine-id r,
 
 # For udev
@@ -141,6 +151,9 @@ shmctl
 # pulseaudio creates on startup.
 setgroups
 setgroups32
+# libapparmor label queries (LSM self-attr syscalls)
+lsm_get_self_attr
+lsm_set_self_attr
 # libudev
 socket AF_NETLINK - NETLINK_KOBJECT_UEVENT
 `
