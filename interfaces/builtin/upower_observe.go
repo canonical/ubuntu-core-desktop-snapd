@@ -198,6 +198,20 @@ dbus (send)
     member={GetHistory,Refresh}
     peer=(label=###SLOT_SECURITY_TAGS###),
 
+# Read keyboard backlight brightness (gnome-settings-daemon power)
+dbus (send)
+    bus=system
+    path=/org/freedesktop/UPower/KbdBacklight
+    interface=org.freedesktop.UPower.KbdBacklight
+    member={GetBrightness,GetMaxBrightness}
+    peer=(label=###SLOT_SECURITY_TAGS###),
+dbus (send)
+    bus=system
+    path=/org/freedesktop/UPower/KbdBacklight
+    interface=org.freedesktop.DBus.Properties
+    member=Get{,All},
+    peer=(label=###SLOT_SECURITY_TAGS###),
+
 # Receive property changed events
 dbus (receive)
     bus=system
