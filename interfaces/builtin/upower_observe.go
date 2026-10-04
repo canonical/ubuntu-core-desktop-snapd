@@ -209,7 +209,7 @@ dbus (send)
     bus=system
     path=/org/freedesktop/UPower/KbdBacklight
     interface=org.freedesktop.DBus.Properties
-    member=Get{,All},
+    member=Get{,All}
     peer=(label=###SLOT_SECURITY_TAGS###),
 
 # Receive property changed events
