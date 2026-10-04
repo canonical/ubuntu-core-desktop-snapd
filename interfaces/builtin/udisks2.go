@@ -76,6 +76,14 @@ dbus (receive)
     interface=org.freedesktop.login1.Manager
     member=PrepareForSleep
     peer=(label=unconfined),
+# udisksd listens for polkit authority changes so cached authorization
+# decisions are dropped when the authority is updated
+dbus (receive)
+    bus=system
+    path=/org/freedesktop/PolicyKit1/Authority
+    interface=org.freedesktop.PolicyKit1.Authority
+    member=Changed
+    peer=(label=unconfined),
 # do not use peer=(label=unconfined) here since this is DBus activated
 dbus (send)
     bus=system
@@ -107,7 +115,7 @@ network netlink raw,
 # Mount points could be in /run/media/<user>/* or /media/<user>/*
 /run/systemd/seats/* r,
 /{,run/}media/{,**} rw,
-mount /dev/{dm-*,nvme*,vd*,hd*,sd*,mmcblk*,fd*,sr*} -> /{,run/}media/**,
+mount /dev/{dm-*,loop*,nvme*,vd*,hd*,sd*,mmcblk*,fd*,sr*} -> /{,run/}media/**,
 umount /{,run/}media/**,
 
 # This should probably be patched to use $SNAP_DATA/run/...
@@ -122,7 +130,7 @@ umount /{,run/}media/**,
 
 # Udisks2 needs to read the raw device for partition information. These rules
 # give raw read access to the system disks and therefore the entire system.
-/dev/{dm-*,nvme*,vd*,hd*,sd*,mmcblk*,fd*,sr*} r,
+/dev/{dm-*,loop*,nvme*,vd*,hd*,sd*,mmcblk*,fd*,sr*} r,
 
 # Needed for probing raw devices
 capability sys_rawio,
