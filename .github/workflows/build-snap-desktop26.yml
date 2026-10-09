@@ -1,0 +1,40 @@
+name: build-snap-desktop26
+on:
+  pull_request:
+  push:
+    branches:
+      - desktop/26
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  snap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: snapcore/action-build@v1
+        id: snapcraft
+        with:
+          # Match upstream snap-builds.yaml: this repo's build-base is
+          # core22, for which the 8.x snapcraft line is the proven path.
+          snapcraft-channel: 8.x/stable
+      - name: Normalize snap filename
+        run: cp "${{ steps.snapcraft.outputs.snap }}" snapd.snap
+      - name: Publish to desktop-26-latest release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view desktop-26-latest -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 \
+            || gh release create desktop-26-latest -R "$GITHUB_REPOSITORY" \
+                 --title "desktop/26 latest snap" \
+                 --notes "Rolling latest desktop/26 snap build; assets are replaced on every green build."
+          gh release upload desktop-26-latest snapd.snap -R "$GITHUB_REPOSITORY" --clobber
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snap
+          path: snapd.snap
+          compression-level: 0
+          retention-days: 14
