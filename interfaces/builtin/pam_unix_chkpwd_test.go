@@ -25,6 +25,7 @@ import (
 	"github.com/snapcore/snapd/interfaces"
 	"github.com/snapcore/snapd/interfaces/apparmor"
 	"github.com/snapcore/snapd/interfaces/builtin"
+	"github.com/snapcore/snapd/interfaces/seccomp"
 	"github.com/snapcore/snapd/snap"
 	"github.com/snapcore/snapd/testutil"
 )
@@ -87,6 +88,13 @@ func (s *pamUnixChkpwdSuite) TestConnectedPlugSnippet(c *C) {
 	c.Assert(snippet, testutil.Contains, `/run/faillock/** rwk,`)
 	c.Assert(snippet, testutil.Contains, `/usr/lib/core/lockout-not-enabled.sh ix,`)
 	c.Assert(snippet, testutil.Contains, `/etc/writable/account-locked.enable r,`)
+}
+
+func (s *pamUnixChkpwdSuite) TestSecCompSpec(c *C) {
+	seccompSpec := seccomp.NewSpecification(s.plug.AppSet())
+	c.Assert(seccompSpec.AddConnectedPlug(s.iface, s.plug, s.slot), IsNil)
+	c.Assert(seccompSpec.Snippets(), HasLen, 1)
+	c.Check(seccompSpec.SnippetForTag("snap.other.app"), testutil.Contains, "socket AF_NETLINK - NETLINK_AUDIT")
 }
 
 func (s *pamUnixChkpwdSuite) TestInterfaces(c *C) {

@@ -78,6 +78,22 @@ const pamUnixChkpwdConnectedPlugAppArmor = `
 /etc/writable/account-locked.enable r,
 `
 
+const pamUnixChkpwdConnectedPlugSecComp = `
+# Description: allow the chkpwd helpers to open the kernel audit socket.
+# The helpers are exec'd from inside the confined snap and inherit its
+# seccomp filter unconditionally (unlike AppArmor policy, which
+# unix_chkpwd/Px and pam_extrausers_chkpwd/Ux transition away from), and
+# the stock template allows socket() for every domain except AF_NETLINK
+# (expecting AppArmor to mediate it instead). pam's _audit_log() calls
+# audit_open() == socket(AF_NETLINK, SOCK_RAW, NETLINK_AUDIT) and treats
+# an open failure with any errno other than
+# EINVAL/EPROTONOSUPPORT/EAFNOSUPPORT as PAM_AUTH_ERR, overriding an
+# otherwise successful password check. (The subsequent netlink send from
+# a non-root caller also fails with EPERM, but pam explicitly handles
+# that case; only the socket creation itself needs allowing here.)
+socket AF_NETLINK - NETLINK_AUDIT
+`
+
 func init() {
 	registerIface(&commonInterface{
 		name:                  "pam-unix-chkpwd",
@@ -85,5 +101,6 @@ func init() {
 		implicitOnCore:        true,
 		baseDeclarationSlots:  pamUnixChkpwdBaseDeclarationSlots,
 		connectedPlugAppArmor: pamUnixChkpwdConnectedPlugAppArmor,
+		connectedPlugSecComp:  pamUnixChkpwdConnectedPlugSecComp,
 	})
 }
