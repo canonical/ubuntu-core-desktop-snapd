@@ -112,6 +112,15 @@ dbus (receive)
     interface=org.freedesktop.DBus.Peer
     member=Ping,
 
+# The daemon watches the polkit authority so cached authorization
+# decisions are dropped when it changes
+dbus (receive)
+    bus=system
+    path=/org/freedesktop/PolicyKit1/Authority
+    interface=org.freedesktop.PolicyKit1.Authority
+    member=Changed
+    peer=(label=unconfined),
+
 # Replies and emitted signals (PropertiesChanged, Changed) go to peers
 # of any label, including confined snap clients
 dbus (send)
@@ -182,6 +191,7 @@ capability fsetid,
 
 # Daemon reads
 /etc/default/locale r,
+/etc/shadow r,
 /etc/gdm3/custom.conf r,
 /etc/systemd/system/display-manager.service r,
 /etc/lightdm/lightdm.conf r,
