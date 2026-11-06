@@ -174,6 +174,7 @@ dbus (send)
 network netlink raw,
 capability audit_write,
 capability chown,
+capability fowner,
 capability fsetid,
 
 # The helpers write login accounting records
