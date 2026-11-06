@@ -199,6 +199,9 @@ capability fsetid,
 /etc/lightdm/lightdm.conf r,
 /run/systemd/seats/ r,
 /run/systemd/seats/* r,
+# the systemd NSS source probes the userdb directory
+/run/systemd/userdb/ r,
+/run/systemd/userdb/* r,
 
 # The helpers create account home directories under /home
 /home/ r,
