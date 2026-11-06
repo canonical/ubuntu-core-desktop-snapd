@@ -192,6 +192,7 @@ capability fsetid,
 # Daemon reads
 /etc/default/locale r,
 /etc/shadow r,
+/etc/shells r,
 /etc/gdm3/custom.conf r,
 /etc/systemd/system/display-manager.service r,
 /etc/lightdm/lightdm.conf r,
@@ -281,9 +282,19 @@ dbus (send)
     member=Introspect,
 `
 
-// Needed because the shadow helpers fchown newly created files to the
-// group owning /etc/shadow, and useradd uses a netlink audit socket.
+// The shadow helpers chown newly created files (account homes to their
+// new uid:gid, spool files to the group owning /etc/shadow) and use the
+// kernel audit netlink socket.
 const accountsserviceSlotSecCompTemplate = `
+# the account helpers chown homes/files to arbitrary uid:gid pairs
+chown
+chown32
+fchown
+fchown32
+fchownat
+lchown
+lchown32
+
 # the shadow helpers require chowning to 0:'{{group}}'
 fchown - u:root {{group}}
 fchown32 - u:root {{group}}
