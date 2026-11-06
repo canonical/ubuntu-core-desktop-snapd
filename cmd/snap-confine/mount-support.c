@@ -929,7 +929,6 @@ void sc_populate_mount_ns(struct sc_apparmor *apparmor, int snap_update_ns_fd, c
             // released.
             {.path = "/mnt", .is_optional = true},                 // to support the removable-media interface
             {.path = "/var/lib/extrausers", .is_optional = true},  // access to UID/GID of extrausers (if available)
-            {.path = "/var/lib/AccountsService", .is_optional = true}, // access to the AccountsService provider snap's state (icons, cached user metadata)
             {},
         };
         struct sc_mount_config normal_config = {
