@@ -268,11 +268,11 @@ dbus (send)
     member=Introspect,
 `
 
-# libudev opens a netlink kobject-uevent socket to monitor reader
-# hotplug events. The default seccomp template allows no socket() at
-# all beyond its explicit list and does not include bind(), so both the
-# socket() and bind() calls the udev monitor makes need explicit
-# entries (the udisks2 slot snippet is the precedent).
+// libudev opens a netlink kobject-uevent socket to monitor reader
+// hotplug events. The default seccomp template allows no socket() at
+// all beyond its explicit list and does not include bind(), so both the
+// socket() and bind() calls the udev monitor makes need explicit
+// entries (the udisks2 slot snippet is the precedent).
 const fprintdPermanentSlotSecComp = `
 # libudev
 bind
