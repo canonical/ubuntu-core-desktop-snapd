@@ -199,9 +199,11 @@ capability fsetid,
 /etc/lightdm/lightdm.conf r,
 /run/systemd/seats/ r,
 /run/systemd/seats/* r,
-# the systemd NSS source probes the userdb directory
+# the systemd NSS source probes the userdb directory; the varlink
+# protocol CONNECTS (writes) to the per-service sockets when resolving
+# systemd dynamic users (the transient wizard session user)
 /run/systemd/userdb/ r,
-/run/systemd/userdb/* r,
+/run/systemd/userdb/* rw,
 
 # The helpers create account home directories under /home
 /home/ r,

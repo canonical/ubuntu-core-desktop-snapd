@@ -52,19 +52,28 @@ dbus (send)
     interface=org.freedesktop.DBus.Introspectable
     member=Introspect,
 
+# godbus clients (e.g. the first-boot wizard backend) ping service
+# objects through the D-Bus peer protocol before using them; the ping is
+# also what triggers the dbus activation of the service
+dbus (send)
+    bus=system
+    path=/org/freedesktop/timedate1
+    interface=org.freedesktop.DBus.Peer
+    member=Ping,
+
 dbus (send)
     bus=system
     path=/org/freedesktop/timedate1
     interface=org.freedesktop.timedate1
     member="SetTimezone"
-    peer=(label=unconfined),
+    peer=(name=org.freedesktop.timedate1),
 
 dbus (send)
     bus=system
     path=/org/freedesktop/timedate1
     interface=org.freedesktop.timedate1
     member="ListTimezones"
-    peer=(label=unconfined),
+    peer=(name=org.freedesktop.timedate1),
 
 # Read all properties from timedate1
 # do not use peer=(label=unconfined) here since this is DBus activated

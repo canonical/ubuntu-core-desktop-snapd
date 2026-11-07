@@ -43,6 +43,14 @@ dbus (send)
 	path=/org/freedesktop/locale1
 	interface=org.freedesktop.DBus.Introspectable
 	member=Introspect,
+# godbus clients (e.g. the first-boot wizard backend) ping service
+# objects through the D-Bus peer protocol before using them; the ping is
+# also what triggers the dbus activation of the service
+dbus (send)
+	bus=system
+	path=/org/freedesktop/locale1
+	interface=org.freedesktop.DBus.Peer
+	member=Ping,
 # Properties of org.freedesktop.locale1
 dbus (send)
 	bus=system
