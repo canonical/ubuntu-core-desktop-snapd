@@ -131,6 +131,15 @@ dbus (send)
     path=/net/reactivated/Fprint{,/Manager,/Device/*}
     interface=org.freedesktop.DBus*,
 
+# The daemon installs a sleep-delay inhibitor on logind so an
+# enrollment is not interrupted by suspend
+# (do not use peer=(label=unconfined) here since this is DBus activated)
+dbus (send)
+    bus=system
+    path=/org/freedesktop/login1
+    interface=org.freedesktop.login1.Manager
+    member=Inhibit,
+
 # The daemon's own state: the enrolled fingerprint data store. On this
 # image the snap binds $SNAP_COMMON here with a layout, since
 # snap-confine builds snap mount namespaces from the base rootfs (which
@@ -259,10 +268,14 @@ dbus (send)
     member=Introspect,
 `
 
-// libudev opens a netlink kobject-uevent socket to monitor reader
-// hotplug events.
+# libudev opens a netlink kobject-uevent socket to monitor reader
+# hotplug events. The default seccomp template allows no socket() at
+# all beyond its explicit list and does not include bind(), so both the
+# socket() and bind() calls the udev monitor makes need explicit
+# entries (the udisks2 slot snippet is the precedent).
 const fprintdPermanentSlotSecComp = `
 # libudev
+bind
 socket AF_NETLINK - NETLINK_KOBJECT_UEVENT
 `
 
