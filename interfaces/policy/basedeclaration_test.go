@@ -827,6 +827,7 @@ plugs:
 var (
 	slotInstallation = map[string][]string{
 		// other
+		"accountsservice":           {"app"},
 		"adb-support":               {"core"},
 		"audio-playback":            {"app", "core"},
 		"audio-record":              {"app", "core"},
@@ -835,6 +836,7 @@ var (
 		"avahi-observe":             {"app", "core"},
 		"bluez":                     {"app", "core"},
 		"bool-file":                 {"core", "gadget"},
+		"bolt":                      {"app"},
 		"browser-support":           {"core"},
 		"checkbox-support":          {"core"},
 		"content":                   {"app", "gadget", "kernel"},
@@ -847,6 +849,8 @@ var (
 		"dsp":                       {"core", "gadget"},
 		"empty":                     {"app"},
 		"fwupd":                     {"app", "core"},
+		"fprintd":                   {"app"},
+		"geoclue":                   {"app"},
 		"gpio":                      {"core", "gadget"},
 		"gpio-control":              {"core"},
 		"greengrass-support":        {"core"},
