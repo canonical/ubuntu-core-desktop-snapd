@@ -109,7 +109,11 @@ func (s *BoltInterfaceSuite) TestUsedSecuritySystems(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(apparmorSpec.SecurityTags(), DeepEquals, []string{"snap.producer.app"})
 	c.Assert(apparmorSpec.SnippetForTag("snap.producer.app"), testutil.Contains, "/var/lib/boltd/** rwkl")
+	// the bus entries under /sys/bus/thunderbolt/devices are symlinks
+	// into /sys/devices and apparmor mediates on the resolved path, so
+	// the write access must be granted on the resolved domain paths
 	c.Assert(apparmorSpec.SnippetForTag("snap.producer.app"), testutil.Contains, "/sys/bus/thunderbolt/** rwkl")
+	c.Assert(apparmorSpec.SnippetForTag("snap.producer.app"), testutil.Contains, "/sys/devices/**/domain[0-9]*/** rw")
 
 	// permanent slots have a non-nil security snippet for seccomp
 	seccompSpec := seccomp.NewSpecification(s.slot.AppSet())
@@ -153,8 +157,13 @@ func (s *BoltInterfaceSuite) TestAppArmorSpec(c *C) {
 	spec = apparmor.NewSpecification(s.slot.AppSet())
 	c.Assert(spec.AddPermanentSlot(s.iface, s.slotInfo), IsNil)
 	c.Assert(spec.SnippetForTag("snap.producer.app"), testutil.Contains, "dbus (receive)\n    bus=system\n    path=/org/freedesktop/bolt{,/**}\n    interface=org.freedesktop.bolt1.{Manager,Domain,Device,Power},")
-	// the thunderbolt sysfs access and the state directory
+	// the thunderbolt sysfs access and the state directory: writes go
+	// through the resolved /sys/devices paths (the bus entries are
+	// symlinks, e.g. /sys/bus/thunderbolt/devices/0-1/authorized is
+	// /sys/devices/pci…/…/domain0/0-1/authorized once resolved)
 	c.Assert(spec.SnippetForTag("snap.producer.app"), testutil.Contains, `/sys/bus/thunderbolt/** rwkl,`)
+	c.Assert(spec.SnippetForTag("snap.producer.app"), testutil.Contains, `/sys/devices/**/domain[0-9]*/** rw,`)
+	c.Assert(spec.SnippetForTag("snap.producer.app"), testutil.Contains, `/sys/devices/**/wmi_bus/**/force_power rw,`)
 	c.Assert(spec.SnippetForTag("snap.producer.app"), testutil.Contains, `/var/lib/boltd/** rwkl,`)
 }
 

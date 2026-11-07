@@ -154,8 +154,25 @@ dbus (send)
 # force power are all read/write attribute access under the thunderbolt
 # bus. No device nodes are involved, so AppArmor path mediation (not a
 # device cgroup) is what governs this.
+#
+# The entries under /sys/bus/thunderbolt/devices are symlinks into
+# /sys/devices (e.g. /sys/bus/thunderbolt/devices/0-1 resolves to
+# /sys/devices/pci…/…/domain0/0-1), and AppArmor mediates on the
+# resolved path, so writes must be granted under /sys/devices below or
+# authorizing a device is denied on real hardware.
 /sys/bus/thunderbolt/ r,
 /sys/bus/thunderbolt/** rwkl,
+
+# Writes land on the resolved paths: the authorized, key, security and
+# bootacl attributes of each thunderbolt domain and of the devices
+# hanging off it. The ** prefix keeps PCI (hex) addressing schemes out
+# of the rule.
+/sys/devices/**/domain[0-9]*/** rw,
+
+# The force-power attribute is exposed through the WMI bus, which
+# resolves elsewhere under /sys/devices; bolt writes 1/0 there to
+# power the controller up when nothing is connected.
+/sys/devices/**/wmi_bus/**/force_power rw,
 
 # Enumeration through sysfs and udev (libudev)
 /sys/bus/ r,
