@@ -213,6 +213,15 @@ dbus (receive, send)
     bus=###DBUS_BUS###
     peer=(name="###DBUS_NAME###-[1-9]{,[0-9]}{,[0-9]}{,[0-9]}{,[0-9]}{,[0-9]}", label=###SLOT_SECURITY_TAGS###),
 
+# allow the first message to a dbus-activated slot service: while the
+# service is being activated its AppArmor label is unknown, so the
+# label-based rules above cannot match and the message that would have
+# brought the service up is denied (same pattern desktop.go uses for
+# the portal services)
+dbus (send)
+    bus=###DBUS_BUS###
+    peer=(name=###DBUS_NAME###),
+
 # allow connected snaps to all paths via ###DBUS_INTERFACE### to allow full
 # integration with connected snaps.
 dbus (receive, send)
