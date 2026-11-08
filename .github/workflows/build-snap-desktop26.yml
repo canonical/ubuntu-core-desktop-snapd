@@ -11,7 +11,15 @@ permissions:
 
 jobs:
   snap:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            suffix: ""
+          - runner: ubuntu-24.04-arm
+            suffix: "-arm64"
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: snapcore/action-build@v1
@@ -21,7 +29,7 @@ jobs:
           # core22, for which the 8.x snapcraft line is the proven path.
           snapcraft-channel: 8.x/stable
       - name: Normalize snap filename
-        run: cp "${{ steps.snapcraft.outputs.snap }}" snapd.snap
+        run: cp "${{ steps.snapcraft.outputs.snap }}" "snapd${{ matrix.suffix }}.snap"
       - name: Publish to desktop-26-latest release
         if: github.event_name != 'pull_request'
         env:
@@ -31,10 +39,10 @@ jobs:
             || gh release create desktop-26-latest -R "$GITHUB_REPOSITORY" \
                  --title "desktop/26 latest snap" \
                  --notes "Rolling latest desktop/26 snap build; assets are replaced on every green build."
-          gh release upload desktop-26-latest snapd.snap -R "$GITHUB_REPOSITORY" --clobber
+          gh release upload desktop-26-latest "snapd${{ matrix.suffix }}.snap" -R "$GITHUB_REPOSITORY" --clobber
       - uses: actions/upload-artifact@v4
         with:
-          name: snap
-          path: snapd.snap
+          name: snap${{ matrix.suffix }}
+          path: "snapd${{ matrix.suffix }}.snap"
           compression-level: 0
           retention-days: 14
