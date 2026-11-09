@@ -615,6 +615,9 @@ var defaultCoreRuntimeTemplateRules = `
   @{SNAP_COREUTIL_DIRS}numfmt ixr,
   @{SNAP_COREUTIL_DIRS}od ixr,
   /{,usr/}bin/openssl ixr, # may cause harmless capability block_suspend denial
+  # the GNOME screen reader: gsd-a11y-settings' PATH-spawn fallback and
+  # the session autostart desktop file exec it from confined callers
+  /{,usr/}bin/orca ixr,
   @{SNAP_COREUTIL_DIRS}paste ixr,
   /{,usr/}bin/pgrep ixr,
   @{SNAP_COREUTIL_DIRS}printenv ixr,
