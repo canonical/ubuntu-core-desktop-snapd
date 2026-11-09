@@ -439,6 +439,7 @@ func init() {
 			name:                 "desktop-legacy",
 			summary:              desktopLegacySummary,
 			implicitOnClassic:    true,
+			implicitOnCore:       true,
 			baseDeclarationSlots: desktopLegacyBaseDeclarationSlots,
 			connectedPlugSecComp: desktopLegacyConnectedPlugSecComp,
 		},

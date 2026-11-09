@@ -98,7 +98,7 @@ func (s *DesktopLegacyInterfaceSuite) TestAppArmorSpec(c *C) {
 
 func (s *DesktopLegacyInterfaceSuite) TestStaticInfo(c *C) {
 	si := interfaces.StaticInfoOf(s.iface)
-	c.Assert(si.ImplicitOnCore, Equals, false)
+	c.Assert(si.ImplicitOnCore, Equals, true)
 	c.Assert(si.ImplicitOnClassic, Equals, true)
 	c.Assert(si.Summary, Equals, `allows privileged access to desktop legacy methods`)
 	c.Assert(si.BaseDeclarationSlots, testutil.Contains, "desktop-legacy")
