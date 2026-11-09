@@ -283,6 +283,39 @@ const systemdUserControlPlasmaKWinAppArmor = `
         peer=(label=unconfined),
     `
 
+const systemdUserControlGsdA11ySettingsAppArmor = `
+    # gsd-a11y-settings starts and stops the orca.service user unit when
+    # the screen reader is enabled and disabled, and registers as a
+    # client of the session manager like the other gsd plugins.
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1
+        interface=org.freedesktop.systemd1.Manager
+        member={GetUnit,StartUnit,StopUnit,ResetFailed,EnableUnitFilesWithFlags,DisableUnitFilesWithFlags}
+        peer=(label=unconfined),
+
+    dbus (send)
+        bus=session
+        path=/org/freedesktop/systemd1/unit/**
+        interface=org.freedesktop.DBus.Properties
+        member={Get,GetAll}
+        peer=(label=unconfined),
+
+    dbus (send)
+        bus=session
+        path=/org/gnome/SessionManager
+        interface=org.gnome.SessionManager
+        member=RegisterClient
+        peer=(label=unconfined),
+
+    dbus (send)
+        bus=session
+        path=/org/gnome/SessionManager
+        interface=org.freedesktop.DBus.Properties
+        member=GetAll
+        peer=(label=unconfined),
+    `
+
 type systemdUserControlInterface struct {
 	commonInterface
 }
@@ -300,8 +333,9 @@ func (iface *systemdUserControlInterface) AppArmorConnectedPlug(
 	gnomeSessionManagerTag := fmt.Sprintf("snap.%s.ubuntu-desktop-session", instanceName)
 	plasmaSessionManagerTag := fmt.Sprintf("snap.%s.plasma-desktop-session", instanceName)
 	plasmaKWinTag := fmt.Sprintf("snap.%s.plasma-kwin-wayland", instanceName)
+	gsdA11ySettingsTag := fmt.Sprintf("snap.%s.gsd-a11y-settings", instanceName)
 	sessionManagerTags := map[string]struct{}{
-		gnomeSessionManagerTag: {},
+		gnomeSessionManagerTag:  {},
 		plasmaSessionManagerTag: {},
 	}
 	for _, runnable := range plug.Runnables() {
@@ -316,6 +350,9 @@ func (iface *systemdUserControlInterface) AppArmorConnectedPlug(
 		}
 		if runnable.SecurityTag == plasmaKWinTag {
 			spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlPlasmaKWinAppArmor)
+		}
+		if runnable.SecurityTag == gsdA11ySettingsTag {
+			spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlGsdA11ySettingsAppArmor)
 		}
 	}
 	return nil

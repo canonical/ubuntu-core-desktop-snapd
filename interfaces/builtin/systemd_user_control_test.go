@@ -105,6 +105,9 @@ apps:
  plasma-kwin-wayland:
   command: kwin
   plugs: [systemd-user-control]
+ gsd-a11y-settings:
+  command: gsd
+  plugs: [systemd-user-control]
  other:
   command: bar
   plugs: [systemd-user-control]
@@ -148,6 +151,12 @@ slots:
 			c.Assert(kwinRules, testutil.Contains, "interface=org.freedesktop.systemd1.Manager\n        member=SetEnvironment")
 			c.Assert(kwinRules, Not(testutil.Contains), "member=StartUnit")
 		}
+
+		a11yRules := strings.Join(snippets["snap."+sessionSnap+".gsd-a11y-settings"], "\n")
+		c.Assert(a11yRules, testutil.Contains, "member={GetUnit,StartUnit,StopUnit,ResetFailed,EnableUnitFilesWithFlags,DisableUnitFilesWithFlags}")
+		c.Assert(a11yRules, testutil.Contains, "path=/org/freedesktop/systemd1/unit/**")
+		c.Assert(a11yRules, testutil.Contains, "member=RegisterClient")
+		c.Assert(a11yRules, Not(testutil.Contains), "member=UpdateActivationEnvironment")
 
 		otherRules := strings.Join(snippets["snap."+sessionSnap+".other"], "\n")
 		c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1.Manager")
