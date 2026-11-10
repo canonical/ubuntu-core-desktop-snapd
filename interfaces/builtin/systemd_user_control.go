@@ -316,6 +316,34 @@ const systemdUserControlGsdA11ySettingsAppArmor = `
         peer=(label=unconfined),
     `
 
+const systemdUserControlDconfServiceAppArmor = `
+    # dconf-service serves the session's dconf database on the session
+    # bus. Its per-connection dbus-dconf snippets name only the connected
+    # provider's plug label (snap.provd.provd on this image), while the
+    # actual dconf writers of a Core desktop session are unconfined: the
+    # wizard's raw-exec provd, ssh/gsettings CLI clients, and any other
+    # non-snap session actor (T7b verbatim denials). Stock dconf-service
+    # accepts any session writer; grant unconfined peers the same
+    # receive/send set the dbus-dconf connection generates. Same-snap
+    # writers are already covered by the template's
+    # snap.@{SNAP_INSTANCE_NAME}.* rule.
+    dbus (receive)
+        bus=session
+        interface=org.freedesktop.DBus.Introspectable
+        member=Introspect
+        peer=(label=unconfined),
+
+    dbus (receive, send)
+        bus=session
+        interface="ca.desrt.dconf{,.*}"
+        peer=(label=unconfined),
+
+    dbus (receive, send)
+        bus=session
+        path="/ca/desrt/dconf{,/**}"
+        peer=(label=unconfined),
+    `
+
 type systemdUserControlInterface struct {
 	commonInterface
 }
@@ -334,6 +362,7 @@ func (iface *systemdUserControlInterface) AppArmorConnectedPlug(
 	plasmaSessionManagerTag := fmt.Sprintf("snap.%s.plasma-desktop-session", instanceName)
 	plasmaKWinTag := fmt.Sprintf("snap.%s.plasma-kwin-wayland", instanceName)
 	gsdA11ySettingsTag := fmt.Sprintf("snap.%s.gsd-a11y-settings", instanceName)
+	dconfServiceTag := fmt.Sprintf("snap.%s.dconf-service", instanceName)
 	sessionManagerTags := map[string]struct{}{
 		gnomeSessionManagerTag:  {},
 		plasmaSessionManagerTag: {},
@@ -353,6 +382,9 @@ func (iface *systemdUserControlInterface) AppArmorConnectedPlug(
 		}
 		if runnable.SecurityTag == gsdA11ySettingsTag {
 			spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlGsdA11ySettingsAppArmor)
+		}
+		if runnable.SecurityTag == dconfServiceTag {
+			spec.AddSnippetForTag(runnable.SecurityTag, systemdUserControlDconfServiceAppArmor)
 		}
 	}
 	return nil

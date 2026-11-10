@@ -108,6 +108,9 @@ apps:
  gsd-a11y-settings:
   command: gsd
   plugs: [systemd-user-control]
+ dconf-service:
+  command: dconf-service
+  plugs: [systemd-user-control]
  other:
   command: bar
   plugs: [systemd-user-control]
@@ -158,10 +161,20 @@ slots:
 		c.Assert(a11yRules, testutil.Contains, "member=RegisterClient")
 		c.Assert(a11yRules, Not(testutil.Contains), "member=UpdateActivationEnvironment")
 
+		dconfRules := strings.Join(snippets["snap."+sessionSnap+".dconf-service"], "\n")
+		c.Assert(dconfRules, testutil.Contains, `interface="ca.desrt.dconf{,.*}"`)
+		c.Assert(dconfRules, testutil.Contains, `path="/ca/desrt/dconf{,/**}"`)
+		c.Assert(dconfRules, testutil.Contains, "member=Introspect")
+		c.Assert(dconfRules, testutil.Contains, "peer=(label=unconfined)")
+		c.Assert(dconfRules, testutil.Contains, "bus=session")
+		c.Assert(dconfRules, Not(testutil.Contains), "bus=system")
+		c.Assert(dconfRules, Not(testutil.Contains), "member=StartUnit")
+
 		otherRules := strings.Join(snippets["snap."+sessionSnap+".other"], "\n")
 		c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1.Manager")
 		c.Assert(otherRules, Not(testutil.Contains), "org.freedesktop.systemd1/unit/")
 		c.Assert(otherRules, Not(testutil.Contains), "UpdateActivationEnvironment")
+		c.Assert(otherRules, Not(testutil.Contains), "ca.desrt.dconf")
 	}
 }
 
