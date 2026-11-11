@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -106,6 +107,20 @@ func serviceStart(inst *client.ServiceInstruction, sysd systemd.Systemd) Respons
 	startErrors := make(map[string]string)
 	var err error
 	if inst.Enable {
+		// Enabling creates the "WantedBy" symlinks under the user
+		// manager's unit directory (XDG_CONFIG_HOME/systemd/user/
+		// <target>.wants/). systemd does not create missing parent
+		// directories: when that tree is gone - the normal state for
+		// an ephemeral user whose home was wiped while the manager is
+		// still active, e.g. the GDM greeter - the enable fails with
+		// "Failed to enable unit: Unit .../.wants/<unit> does not
+		// exist" and a snap refresh that re-enables the user services
+		// aborts. Create the wanted-by directories ourselves first;
+		// these are the only targets snapd generates for user
+		// services (wrappers/internal: Services/Sockets/TimersTarget).
+		if err = ensureUserUnitWantsDirs(); err != nil {
+			return InternalError("cannot prepare user unit directories for %q: %v", inst.Services, err)
+		}
 		if err = sysd.EnableNoReload(inst.Services); err != nil {
 			return InternalError("cannot enable snap services %q: %v", inst.Services, err)
 		}
@@ -164,6 +179,30 @@ func serviceStart(inst *client.ServiceInstruction, sysd systemd.Systemd) Respons
 			},
 		},
 	})
+}
+
+// ensureUserUnitWantsDirs creates the user manager's unit "wants"
+// directories that "systemctl --user enable" links snap services into.
+// See the comment in serviceStart for why this is needed before every
+// enable.
+func ensureUserUnitWantsDirs() error {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		// No resolvable user config directory: leave it to the
+		// enable to fail (or succeed) as it did before.
+		return nil
+	}
+	unitDir := filepath.Join(configDir, "systemd", "user")
+	for _, target := range []string{
+		systemd.UserServicesTarget,
+		systemd.SocketsTarget,
+		systemd.TimersTarget,
+	} {
+		if err := os.MkdirAll(filepath.Join(unitDir, target+".wants"), 0755); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func serviceRestart(inst *client.ServiceInstruction, sysd systemd.Systemd) Response {

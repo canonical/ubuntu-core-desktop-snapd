@@ -202,6 +202,44 @@ func (s *restSuite) TestServiceControlStartEnable(c *C) {
 	})
 }
 
+func (s *restSuite) TestServiceControlStartEnableMissingUnitDirs(c *C) {
+	// Mirror an ephemeral user whose home was wiped while the manager
+	// is still active (the GDM greeter): the user config dir does not
+	// exist at all. The enable must still proceed (and create the
+	// wanted-by directories), instead of failing the whole operation
+	// with systemd's "Failed to enable unit: Unit ... does not exist"
+	// and aborting the refresh (T25 gate 6).
+	configDir := c.MkDir()
+	oldVal := os.Getenv("XDG_CONFIG_HOME")
+	c.Assert(os.Setenv("XDG_CONFIG_HOME", configDir), IsNil)
+	defer func() { c.Assert(os.Setenv("XDG_CONFIG_HOME", oldVal), IsNil) }()
+
+	req := httptest.NewRequest("POST", "/v1/service-control", bytes.NewBufferString(`{"action":"start", "enable":true,"services":["snap.foo.socket", "snap.bar.service"]}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	agent.ServiceControlCmd.POST(agent.ServiceControlCmd, req).ServeHTTP(rec, req)
+	c.Check(rec.Code, Equals, 200)
+
+	var rsp resp
+	c.Assert(json.Unmarshal(rec.Body.Bytes(), &rsp), IsNil)
+	c.Check(rsp.Type, Equals, agent.ResponseTypeSync)
+	c.Check(rsp.Result, Equals, nil)
+
+	// The wants directories systemd needs for the symlinks now exist.
+	for _, target := range []string{"default.target", "sockets.target", "timers.target"} {
+		fi, err := os.Stat(filepath.Join(configDir, "systemd", "user", target+".wants"))
+		c.Assert(err, IsNil, Commentf("missing wants dir for %s", target))
+		c.Assert(fi.IsDir(), Equals, true)
+	}
+
+	c.Check(s.sysdLog, DeepEquals, [][]string{
+		{"--user", "--no-reload", "enable", "snap.foo.socket", "snap.bar.service"},
+		{"--user", "daemon-reload"},
+		{"--user", "start", "snap.foo.socket"},
+		{"--user", "start", "snap.bar.service"},
+	})
+}
+
 func (s *restSuite) TestServiceControlStartEnableFailsAndDisables(c *C) {
 	var sysdLog [][]string
 	restore := systemd.MockSystemctl(func(cmd ...string) ([]byte, error) {
