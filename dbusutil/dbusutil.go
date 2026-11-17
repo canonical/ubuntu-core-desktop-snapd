@@ -63,6 +63,23 @@ func isSessionBusLikelyPresent() bool {
 // This function is mockable by either MockConnections or
 // MockOnlySessionBusAvailable.
 var SessionBus = func() (*dbus.Conn, error) {
+	if address := os.Getenv("DBUS_SESSION_BUS_ADDRESS"); address == "" {
+		// The environment carries no session bus address: snap run may
+		// have been started from a context that never had the session
+		// environment (ssh, runuser, cron, a user unit without the
+		// imported manager environment, a greeter with a dynamic uid).
+		// The per-user bus socket managed by systemd --user is the
+		// canonical address in those cases; export it so that both
+		// isSessionBusLikelyPresent below and godbus itself can find
+		// the bus. Without this, snap run cannot create transient
+		// scopes for application tracking and core26+ applications
+		// refuse to start with "cannot track application process".
+		uid := os.Getuid()
+		socket := fmt.Sprintf("%s/%d/bus", dirs.XdgRuntimeDirBase, uid)
+		if fi, err := os.Stat(socket); err == nil && fi.Mode()&os.ModeType == os.ModeSocket {
+			os.Setenv("DBUS_SESSION_BUS_ADDRESS", "unix:path="+socket)
+		}
+	}
 	if isSessionBusLikelyPresent() {
 		return dbus.SessionBus()
 	}
