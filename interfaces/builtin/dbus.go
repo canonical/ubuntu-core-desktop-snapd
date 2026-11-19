@@ -224,7 +224,7 @@ dbus (receive, send)
 # connection itself is the consent act (deny-auto-connection is the
 # base declaration default for this interface). Send by unconfined
 # clients needs no rule (unconfined profiles are not mediated).
-# Session-bus only (T17 D6): upstream ships the unconfined-peer block
+# Session-bus only: upstream ships the unconfined-peer block
 # in dbusPermanentSlotAppArmorClassic only for classic, where every
 # session service is exposed this way; on the system bus the same
 # block would hand every unconfined local process (any non-root user,
@@ -235,7 +235,7 @@ dbus (receive, send)
 // dbusConnectedSlotAppArmorSession carries the session-bus-only peer
 // rules for connected slots (see the comment inside
 // dbusConnectedSlotAppArmor for the unconfined block's rationale and
-// the D6 scoping). The rules keep upstream's two-sided check for
+// session-bus scoping). The rules keep upstream's two-sided check for
 // confined peers: a confined snap reaches a connected slot's service
 // only through a receive rule the slot's own interface grants — the
 // generic dbus snippets do NOT admit confined peers interface-wide.
@@ -517,8 +517,8 @@ func (iface *dbusInterface) AppArmorConnectedSlot(spec *apparmor.Specification, 
 	// well-known DBus name-specific connected slot policy
 	snippet := getAppArmorSnippet(dbusConnectedSlotAppArmor, bus, name)
 	if bus == "session" {
-		// unconfined- and confined-peer receive rules are
-		// session-bus only (T17 D6/D1); system-bus slots keep
+		// unconfined-peer receive rules are
+		// session-bus only; system-bus slots keep
 		// plug-tag-scoped peers only
 		snippet += getAppArmorSnippet(dbusConnectedSlotAppArmorSession, bus, name)
 	}

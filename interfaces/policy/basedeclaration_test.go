@@ -252,7 +252,7 @@ func (s *baseDeclSuite) TestAutoConnectPlugSlot(c *C) {
 		// netlink-driver needs the family-name attributes to match
 		"netlink-driver": true,
 		// the reader/provider capability is never auto-connected
-		// (T30; deny-auto-connection in the base declaration)
+		// (the reader role: deny-auto-connection in the base declaration)
 		"accessibility-provider": true,
 	}
 
@@ -830,7 +830,7 @@ plugs:
 var (
 	slotInstallation = map[string][]string{
 		// other
-		// nil: allow-installation: false (T30 reader role + T29 C1) -
+		// nil: allow-installation: false (the install-gated reader role) -
 		// installation only via a snap-declaration grant; tested
 		// specially below
 		"accessibility-provider":    nil,
@@ -1046,7 +1046,7 @@ slots:
 	c.Assert(err, Not(IsNil))
 	c.Assert(err, ErrorMatches, "installation denied by \"shared-memory\" slot rule of interface \"shared-memory\"")
 
-	// test accessibility-provider specially (T29 C1): allow-installation
+	// test accessibility-provider specially: allow-installation
 	// false - no snap type may install the slot; only a snap-declaration
 	// grant can lift it. The minimal check used for --dangerous installs
 	// ignores the deny/allow rules (custom-device posture), so local
@@ -1062,7 +1062,7 @@ slots:
 	err = icMin.Check()
 	c.Assert(err, IsNil)
 
-	// test the dbus org.a11y.Bus reservation specially (T29 C6): an app
+	// test the dbus org.a11y.Bus reservation specially: an app
 	// snap declaring a dbus slot with the accessibility bus name is
 	// DENIED by the base declaration deny-installation rule...
 	ic = s.installSlotCand(c, "dbus", snap.TypeApp, `name: a11y-squatter
@@ -1201,7 +1201,7 @@ func (s *baseDeclSuite) TestPlugInstallation(c *C) {
 	all := builtin.Interfaces()
 
 	restricted := map[string]bool{
-		// the reader role is install-gated (T30)
+		// the reader role is install-gated
 		"accessibility-provider":           true,
 		"auditd-support":                   true,
 		"block-devices":                    true,
@@ -1521,7 +1521,7 @@ func (s *baseDeclSuite) TestValidity(c *C) {
 	// listed here to make sure that was a conscious decision
 	bothSides := map[string]bool{
 		// the reader role (plug) and the provider capability (slot):
-		// both sides carry base-declaration rules (T30)
+		// both sides carry base-declaration rules
 		"accessibility-provider":           true,
 		"auditd-support":                   true,
 		"block-devices":                    true,

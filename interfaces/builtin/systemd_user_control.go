@@ -284,9 +284,15 @@ const systemdUserControlPlasmaKWinAppArmor = `
     `
 
 const systemdUserControlGsdA11ySettingsAppArmor = `
-    # gsd-a11y-settings starts and stops the orca.service user unit when
-    # the screen reader is enabled and disabled, and registers as a
-    # client of the session manager like the other gsd plugins.
+    # gsd-a11y-settings starts and stops the screen reader's orca.service
+    # user unit when the screen reader is enabled and disabled, and
+    # registers as a client of the session manager like the other gsd
+    # plugins. NOTE: the systemd1 Manager calls below are UNIT-AGNOSTIC
+    # — AppArmor cannot scope them by D-Bus argument, so the grant covers
+    # Start/Stop/Enable/Disable of ANY user unit. That is in scope for an
+    # interface named "control the user session service manager"; the
+    # orca.service mention is the motivating case, not the limit of the
+    # grant.
     dbus (send)
         bus=session
         path=/org/freedesktop/systemd1

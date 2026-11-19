@@ -208,7 +208,7 @@ func (s *restSuite) TestServiceControlStartEnableMissingUnitDirs(c *C) {
 	// exist at all. The enable must still proceed (and create the
 	// wanted-by directories), instead of failing the whole operation
 	// with systemd's "Failed to enable unit: Unit ... does not exist"
-	// and aborting the refresh (T25 gate 6).
+	// and aborting the refresh.
 	configDir := c.MkDir()
 	oldVal := os.Getenv("XDG_CONFIG_HOME")
 	c.Assert(os.Setenv("XDG_CONFIG_HOME", configDir), IsNil)

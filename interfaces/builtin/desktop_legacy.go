@@ -42,15 +42,16 @@ const desktopLegacyConnectedPlugAppArmor = `
 # access to the user's input.
 
 # accessibility (a11y)
-# Two peer classes, scoped differently (T17 D3):
+# Two peer classes, scoped differently:
 #
 # - Provider peers (the org.a11y.Bus owner on the session bus and the
 #   at-spi registry on the private bus, which with a confined provider
 #   both run under the provider snap's label) are pinned to
 #   snap.ubuntu-desktop-a11y.* plus the legacy unconfined provider.
 #   Name ownership is NOT what enforces this (a squatter could own
-#   org.a11y.Bus today - that is D4's reservation problem); the pin
-#   removes the generic snap.* reach these rules had under 1826bfd5af.
+#   org.a11y.Bus - the reservation lives in the dbus interface's base
+#   declaration rules); the pin
+#   removes the generic snap.* reach these rules once had.
 #
 # - Application peers (event broadcasts and tree reads between a11y
 #   clients, e.g. the screen reader reading application trees) keep the
@@ -59,7 +60,7 @@ const desktopLegacyConnectedPlugAppArmor = `
 #   pinning those peers to the provider's label would break every
 #   legitimate shell->app and reader->app read. The accessibility bus
 #   is a shared trust domain; the long-term fix for scoping these is
-#   provider-interface label work (T11 §2/§5), not this file.
+#   provider-interface label work, not this file.
 #include <abstractions/dbus-session-strict>
 dbus (send)
     bus=session
@@ -94,8 +95,7 @@ dbus (send)
 # conventional path (launch-a11y-bus overrides XDG_RUNTIME_DIR to the
 # host per-uid runtime dir), so no snap.* path rule exists: a snap.*
 # wildcard here would admit every snap's at-spi socket, letting an
-# X11-property-poisoning attacker redirect clients to its own bus
-# (T17 D2).
+# X11-property-poisoning attacker redirect clients to its own bus.
 owner /{,var/}run/user/[0-9]*/at-spi/bus* rw,
 
 # Allow access to the socket used by speech-dispatcher
@@ -103,7 +103,7 @@ owner /{,var/}run/user/[0-9]*/speech-dispatcher/speechd.sock rw,
 
 # Allow the accessibility services in the user session to reach us, on
 # the private bus, through the three surfaces a NON-READER a11y client
-# must accept (T29 C2: the catch-all unnamed receive is gone — it was
+# must accept (the catch-all unnamed receive is gone — it was
 # the cross-snap tree-read hole; a desktop-legacy-only snap could read
 # every other snap's tree by directly messaging its objects). The
 # kernel checks BOTH sides of every message: the sender's send rule
@@ -167,12 +167,12 @@ dbus (receive)
 #    b. The shared read surfaces (Accessible Get*, Properties
 #       Get{,All}, Collection GetMatches,
 #       Application GetApplicationBusAddress, Cache GetItems) plus
-#       Properties.Set (the reader's Value drive). T45 (owner ruling):
-#       the desktop-legacy read SENDS for these surfaces are GONE —
+#       Properties.Set (the reader's Value drive). The desktop-legacy
+#       read SENDS for these surfaces are GONE —
 #       the only confined senders left are reader-role profiles, which
 #       all sit under the provider's label glob, so this pin is what
 #       admits the reader; a desktop-legacy-only snap is denied at its
-#       own send side first and at this wall second (the T43 wall kept
+#       own send side first and at this wall second (the pin kept
 #       as defence in depth; the unconfined leg keeps the fat-line
 #       unconfined provider working).
 dbus (receive)
@@ -227,11 +227,12 @@ dbus (receive)
     member=Set
     peer=(label="{snap.ubuntu-desktop-a11y.*,unconfined}"),
 #
-# 3. Event and cache broadcasts (the one shared trust domain, T29 C5's
-# accepted risk, now stated): apps broadcast events and cache updates
+# 3. Event and cache broadcasts (the one shared trust domain, an
+# accepted and stated risk): apps broadcast events and cache updates
 # and every a11y client receives them — interface-scoped, any member,
 # any peer. This is the RECEIVE counterpart of the interface-scoped
-# event SENDS above; spoofed broadcasts are the documented C5 risk,
+# event SENDS above; spoofed broadcasts are the documented risk of
+# this shared trust domain,
 # unchanged by this narrowing.
 dbus (receive)
     bus=accessibility
@@ -249,7 +250,7 @@ dbus (receive)
     bus=accessibility
     interface=org.a11y.atspi.Cache
     peer=(label="{snap.*,unconfined}"),
-# NOTE (T29 C2, D3 line): there is deliberately NO unnamed receive on
+# NOTE (the isolation line): there is deliberately NO unnamed receive on
 # bus=accessibility here — no rule without an interface condition and
 # no receive with a bare snap.* peer survives this narrowing.
 
@@ -288,7 +289,8 @@ dbus (send)
 # SelectionChanged, BoundsChanged, TextSelectionChanged, window
 # events...), and events are broadcasts whose content readers already
 # get through the Get* rules - the shared trust domain is the peer
-# alternation (T24: the cache broadcasts were denied member-by-member).
+# alternation (the cache broadcasts were denied member-by-member; the
+# interface scoping replaced that).
 dbus (send)
     bus=accessibility
     path="/org/a11y/atspi/accessible/root"
@@ -299,11 +301,11 @@ dbus (send)
     path="/org/a11y/atspi/accessible/root"
     interface="org.a11y.atspi.Event.Window"
     peer=(name=org.freedesktop.DBus, label="{snap.*,unconfined}"),
-# T45 (owner ruling): the desktop-legacy READ sends are DROPPED. The
+# The desktop-legacy READ sends are DROPPED. The
 # reader role (the accessibility-provider connected plug) is the one
 # complete statement of the reader send-set, so the pre-reader-role
-# sends desktop-legacy granted to {snap.*,unconfined} are obsolete
-# (T29 C2's endpoint). Gone from this file: the tree reads at all
+# sends desktop-legacy granted to {snap.*,unconfined} are obsolete.
+# Gone from this file: the tree reads at all
 # three path shapes — org.a11y.atspi.Accessible Get*, org.freedesktop
 # .DBus.Properties Get{,All} at root, /org/a11y/atspi/accessible/
 # [0-9]* and /**/a11y/*; org.a11y.atspi.Collection GetMatches and
@@ -322,9 +324,9 @@ dbus (send)
 # only cover /org/a11y/atspi/accessible/..., where readers were
 # historically unconfined and unmediated. The reader grants at the
 # GTK4 paths live in the reader role (the accessibility-provider
-# connected plug — T24 live evidence: the calculator registers, then
+# connected plug — live evidence: the calculator registers, then
 # every reader-side query at its context paths is denied); the
-# desktop-legacy read sends at this shape are dropped (T45).
+# desktop-legacy read sends at this shape are dropped.
 dbus (send)
     bus=accessibility
     path="/org/a11y/atspi/accessible/[0-9]*"
@@ -337,18 +339,18 @@ dbus (send)
     peer=(name=org.freedesktop.DBus, label="{snap.*,unconfined}"),
 # The CLASSIC numeric object paths (pre-GTK4 atspi layout): apps that
 # are not GTK4 (gnome-shell, gtk3 apps) host their tree at
-# /org/a11y/atspi/accessible/<n>. T45 (owner ruling): the reader sends
+# /org/a11y/atspi/accessible/<n>. The reader sends
 # that were granted here for the confined reader — org.a11y.atspi
-# .Accessible Get* (added bafad9d025 after the T25 gate evidence: 1267
+# .Accessible Get* (the classic-path widening: 1267
 # denials, all Accessible Get* at /org/a11y/atspi/accessible/<n>,
 # sender snap.ubuntu-desktop-a11y.orca, peer
 # snap.ubuntu-desktop-session.gnome-shell) and org.a11y.atspi
-# .Collection GetMatches (added 986a18cefa after the T26 greeter
-# re-test) — are DROPPED with the rest of the pre-reader-role
+# .Collection GetMatches (the tree-search interface pyatspi drives,
+# granted after the greeter-tree re-test) — are DROPPED with the rest of the pre-reader-role
 # desktop-legacy read sends; the reader role grants both at this
 # shape. A desktop-legacy-only snap that tries to read them is denied
 # at its own send side first (no send rule survives) and at the pinned
-# Get* receives in the block above second (the T43 wall, unchanged).
+# Get* receives in the block above second.
 # the GTK4 context paths (see the comment above)
 dbus (send)
     bus=accessibility
@@ -366,11 +368,11 @@ dbus (send)
     interface="org.a11y.atspi.Event.Document"
     peer=(name=org.freedesktop.DBus, label="{snap.*,unconfined}"),
 
-# T45 (owner ruling): the cache send is NARROWED to the broadcasts.
+# The cache send is NARROWED to the broadcasts.
 # org.a11y.atspi.Cache GetItems is a unicast READ of another snap's
 # cached tree — that read-send is dropped (the reader role grants
 # Cache GetItems, member-scoped); Add/RemoveAccessible stay, the
-# C5-class broadcast surface, matching the receive side (the
+# broadcast surface, matching the receive side (the
 # org.a11y.atspi.Cache receive in the event block above is unchanged).
 dbus (send)
     bus=accessibility

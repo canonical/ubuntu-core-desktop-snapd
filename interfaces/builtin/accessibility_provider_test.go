@@ -83,7 +83,7 @@ func (s *AccessibilityProviderInterfaceSuite) TestInterfaces(c *C) {
 }
 
 func (s *AccessibilityProviderInterfaceSuite) TestPermanentSlotAppArmorEmpty(c *C) {
-	// T29 C1: the slot must grant NOTHING on installation - every
+	// the slot must grant NOTHING on installation - every
 	// provider privilege rides the connection
 	appSet, err := interfaces.NewSnapAppSet(s.slotInfo.Snap, nil)
 	c.Assert(err, IsNil)
@@ -106,8 +106,8 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedSlotAppArmor(c *C) {
 	// /proc/<pid>/mounts (setmntent) to locate securityfs and
 	// aa_query_label opens /sys/kernel/security/apparmor/.access O_RDWR
 	// (write the query, read the answer); without these the confined
-	// dbus-daemon fail-opens at bus_apparmor_pre_init (T18 E2) - and
-	// with T29 C1 the grants ride the CONNECTION, not the installation
+	// dbus-daemon fail-opens at bus_apparmor_pre_init - and
+	// the grants ride the CONNECTION, not the installation
 	c.Assert(snippet, testutil.Contains, "@{PROC}/@{pid}/mounts                   r,\n")
 	c.Assert(snippet, testutil.Contains, "/sys/kernel/security/apparmor/.access   rw,\n")
 	// the conventional socket path (the launcher overrides XDG_RUNTIME_DIR)
@@ -121,12 +121,12 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedSlotAppArmor(c *C) {
 		"dbus (receive)\n    bus=accessibility\n    peer=(label=\"{snap.@{SNAP_INSTANCE_NAME}.*,unconfined}\"),\n")
 	c.Assert(snippet, testutil.Contains,
 		"dbus (send)\n    bus=accessibility\n    peer=(label=\"{snap.@{SNAP_INSTANCE_NAME}.*,unconfined}\"),\n")
-	// the app-facing join surface for desktop-legacy clients (gate 2):
+	// the app-facing join surface for desktop-legacy clients:
 	// the driver handshake mirrored from
 	// abstractions/dbus-accessibility-strict and the registration /
 	// reader calls mirrored from desktop-legacy's pinned registry
 	// sends - every rule scoped by path/interface/member, receive-only,
-	// never the unnamed tree-walking surface (T17 D3)
+	// never the unnamed tree-walking surface
 	c.Assert(snippet, testutil.Contains,
 		"dbus (receive)\n    bus=accessibility\n    path=/org/freedesktop/DBus\n"+
 			"    interface=org.freedesktop.DBus\n"+
@@ -166,7 +166,7 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedSlotAppArmor(c *C) {
 		"dbus (receive)\n    bus=session\n    path=/org/a11y/bus\n"+
 			"    interface=org.a11y.Bus\n    member=GetAddress\n"+
 			"    peer=(label=snap.*),\n")
-	// the provider-to-app sends the registration contract needs (T24):
+	// the provider-to-app sends the registration contract needs:
 	// the registry's 30s Peer.Ping health check (an app whose ping
 	// errors is DISABLED and removed from the desktop tree), the
 	// Application.Id assignment after Embed, and the listener
@@ -185,15 +185,15 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedSlotAppArmor(c *C) {
 			"    member=EventListener{Registered,Deregistered}\n"+
 			"    peer=(name=org.freedesktop.DBus, label=snap.*),\n")
 	// the device event controller's keystroke-listener bookkeeping
-	// broadcast (T30: 433 denials registryd->gnome-shell on the T28
-	// final bake with the rule absent)
+	// broadcast (the bake-wide denial capture that motivated it: 433
+	// denials registryd->gnome-shell with the rule absent)
 	c.Assert(snippet, testutil.Contains,
 		"dbus (send)\n    bus=accessibility\n"+
 			"    path=/org/a11y/atspi/registry/deviceeventcontroller\n"+
 			"    interface=org.a11y.atspi.DeviceEventListener\n"+
 			"    member=KeystrokeListener{Registered,Deregistered}\n"+
 			"    peer=(name=org.freedesktop.DBus, label=snap.*),\n")
-	// no unnamed snap.* receive on the private bus (T17 D3 isolation
+	// no unnamed snap.* receive on the private bus (the isolation
 	// line) and no system-bus rules here
 	c.Assert(snippet, Not(testutil.Contains), "bus=system")
 	c.Assert(snippet, Not(testutil.Contains),
@@ -214,7 +214,7 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedPlugAppArmor(c *C) {
 	snippet := spec.SnippetForTag("snap.reader.orca")
 
 	// the reader send-set is derived from at-spi2-core's interface XML
-	// (T29 C4), not chased denial-by-denial. Text reads + caret control:
+	// derived once from the interface XML, not chased denial-by-denial. Text reads + caret control:
 	c.Assert(snippet, testutil.Contains,
 		"dbus (send)\n    bus=accessibility\n"+
 			"    path=\"/org/a11y/atspi/accessible/[0-9]*\"\n"+
@@ -249,14 +249,14 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedPlugAppArmor(c *C) {
 	c.Assert(snippet, testutil.Contains,
 		"path=\"/org/a11y/atspi/cache\"\n    interface=\"org.a11y.atspi.Cache\"\n"+
 			"    member=\"GetItems\"")
-	// the handshake liveness probe (T32/T33: 3x Peer.Ping orca ->
+	// the handshake liveness probe (the denial that motivated it: 3x Peer.Ping orca ->
 	// gnome-shell DENIED at path=/ on the private bus during the
 	// post-login handshake - the reader role's app-peer Ping send):
 	c.Assert(snippet, testutil.Contains,
 		"dbus (send)\n    bus=accessibility\n    path=/\n"+
 			"    interface=org.freedesktop.DBus.Peer\n    member=Ping\n"+
 			"    peer=(label=\"{snap.*,unconfined}\"),\n")
-	// the tree-read sends completed by T29 C2 (previously only in
+	// the tree-read sends that complete the role (previously only in
 	// desktop-legacy): Accessible Get* at all three shapes, Properties
 	// Get{,All}, Collection GetMatches, GetApplicationBusAddress
 	c.Assert(snippet, testutil.Contains,
@@ -307,7 +307,7 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedPlugAppArmor(c *C) {
 }
 
 func (s *AccessibilityProviderInterfaceSuite) TestSecCompPermanentSlotEmpty(c *C) {
-	// T29 C1: nothing on installation
+	// nothing on installation
 	appSet, err := interfaces.NewSnapAppSet(s.slotInfo.Snap, nil)
 	c.Assert(err, IsNil)
 	spec := seccomp.NewSpecification(appSet)
@@ -327,18 +327,18 @@ func (s *AccessibilityProviderInterfaceSuite) TestSecCompConnectedSlot(c *C) {
 	snippet := spec.SnippetForTag("snap.provider.bus")
 	// aa_getcon() (dbus bus_apparmor_full_init) needs the LSM
 	// self-attribute syscall; the strict template denies it and
-	// libapparmor does not fall back to /proc attr on EPERM (T29 C1:
+	// libapparmor does not fall back to /proc attr on EPERM (the
 	// rides the connection)
 	c.Assert(snippet, testutil.Contains, "\nlsm_get_self_attr\n")
 }
 
 func (s *AccessibilityProviderInterfaceSuite) TestBaseDeclarationSlots(c *C) {
-	// T29 C1: the slot is super-privileged - installation denied by the
+	// the slot is super-privileged - installation denied by the
 	// base declaration (only a snap-declaration can allow it; the
 	// custom-device/opengl-driver-libs posture), never auto-connected.
 	si := interfaces.StaticInfoOf(s.iface)
 	c.Assert(si.BaseDeclarationSlots, testutil.Contains, "allow-installation: false")
 	c.Assert(si.BaseDeclarationSlots, testutil.Contains, "deny-auto-connection: true")
-	// and the plug side keeps its T30 gating
+	// and the plug side keeps its install gating
 	c.Assert(si.BaseDeclarationPlugs, testutil.Contains, "allow-installation: false")
 }

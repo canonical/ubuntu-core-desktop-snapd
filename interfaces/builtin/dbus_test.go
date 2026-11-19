@@ -420,8 +420,8 @@ func (s *DbusInterfaceSuite) TestConnectedSlotAppArmorSession(c *C) {
 	// verify interface in rule
 	c.Check(snippet, testutil.Contains, "interface=\"org.test-session-connected{,.*}\"\n")
 
-	// session-bus slots carry the unconfined-peer receive rules (T17
-	// D6: session-bus only). Confined peers keep the two-sided check:
+	// session-bus slots carry the unconfined-peer receive rules
+	// (session-bus only). Confined peers keep the two-sided check:
 	// the generic connected-slot snippet must NOT admit them
 	// interface-wide — interfaces that need a confined-client surface
 	// carry their own scoped receive rule (the accessibility-provider
@@ -460,8 +460,8 @@ func (s *DbusInterfaceSuite) TestConnectedSlotAppArmorSystem(c *C) {
 	// verify interface in rule
 	c.Check(snippet, testutil.Contains, "interface=\"org.test-system-connected{,.*}\"\n")
 
-	// T17 D6 NEGATIVE: the unconfined-peer and confined-peer receive
-	// blocks are session-bus only; a system-bus slot must not grant
+	// NEGATIVE: the unconfined-peer receive block is
+	// session-bus only; a system-bus slot must not grant
 	// unconfined (or arbitrary-snap) peers access (an unconfined peer
 	// can be any non-root local process, an SSH session included, and
 	// the dbus base declaration does not constrain slot names beyond

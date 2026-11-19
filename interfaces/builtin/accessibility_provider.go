@@ -42,13 +42,13 @@ import (
 // aa_query_label() opens /sys/kernel/security/apparmor/.access O_RDWR to
 // submit a query and read the answer — without these dbus'
 // bus_apparmor_pre_init() fail-opens: the daemon behaves as if AppArmor
-// was not present and mediates nothing (T18 E2)), the LSM
+// was not present and mediates nothing), the LSM
 // self-attribute syscall (aa_getcon for the daemon's own label), the
 // conventional socket path, and the provider-side accessibility-bus
 // contract. The same two-rule query shape is what the
 // thumbnailer-service interface ships for its aa_query_label use.
 //
-// Privilege placement (T29 C1): NOTHING is granted by the permanent
+// Privilege placement: NOTHING is granted by the permanent
 // slot snippet. Installation of the slot is denied by the base
 // declaration unless a snap-declaration explicitly allows it (the
 // snapd-control/kernel-module-control/custom-device posture: the
@@ -65,8 +65,8 @@ import (
 //
 // The plug side carries the reader role (see the comment above
 // accessibilityProviderConnectedPlugAppArmor): the complete
-// screen-reader send-set on the private bus (T29 C2: the role is the
-// one statement of what a reader may send; desktop-legacy keeps its
+// screen-reader send-set on the private bus (the role is the one
+// statement of what a reader may send; desktop-legacy keeps its
 // client surface for non-reader flows). The base declaration gates the
 // plug to installation + manual connection (never auto); the a11y
 // snap's orca app holds it as a same-snap connection.
@@ -84,16 +84,15 @@ const accessibilityProviderBaseDeclarationSlots = `
     deny-auto-connection: true
 `
 
-// The plug side is the READER role (T11 §2: "define the reader contract
-// from at-spi2-core's interface list, once, as a reader role"; T29 C4):
-// what a screen reader must be able to SEND on the private bus, derived
-// from at-spi2-core's interface XML (xml/*.xml, 2.60.x) rather than
+// The plug side is the READER role: what a screen reader must be able
+// to SEND on the private bus, defined once from at-spi2-core's
+// interface XML (xml/*.xml, 2.60.x) rather than
 // chased denial-by-denial. The member lists below are the complete
 // 2.60 interface surfaces a reader drives: the app-tree interfaces
 // (Text, EditableText, Action, Component, Selection, Hypertext/
 // Hyperlink, Document, Table, TableCell, Cache) toward application
 // peers, the connection-root Peer.Ping liveness probe of those peers
-// (the post-login handshake member, T32/T33), and the registry-side
+// (the post-login handshake member), and the registry-side
 // interfaces (Registry event
 // registration, the DeviceEventController key/mouse listener and
 // synthetic-event surface) toward the registry, which runs inside the
@@ -104,15 +103,15 @@ const accessibilityProviderBaseDeclarationSlots = `
 // events register through Registry.RegisterEvent (mouse:* types), and
 // the DEC surface is the seven methods in its XML. The tree-read
 // sends (Accessible Get*, Properties Get{,All}, Collection
-// GetMatches, Application GetApplicationBusAddress) complete the role
-// (T29 C2): a reader holding this plug needs no other grant to walk
-// and drive an application tree. desktop-legacy keeps the general
-// client surface (handshake, registration, events, the same reads) so
-// non-reader clients are unchanged; narrowing it further is the
-// upstream-time work (the fork's narrowed CLIENT RECEIVE is what
-// enforces the isolation line today).
+// GetMatches, Application GetApplicationBusAddress) complete the role:
+// a reader holding this plug needs no other grant to walk
+// and drive an application tree. desktop-legacy keeps the client
+// surface non-reader flows need (handshake, registration, event
+// broadcasts); the tree-read sends live here only — the narrowed
+// desktop-legacy CLIENT RECEIVE enforces the isolation line: a
+// non-reader peer cannot walk another snap's tree.
 //
-// Peer discipline (T17 D3, maintained): every app-tree rule keeps the
+// Peer discipline: every app-tree rule keeps the
 // exact peer alternation of the reader sends desktop-legacy already
 // carries ({snap.*,unconfined}); every registry rule keeps
 // desktop-legacy's pinned registry peer
@@ -388,7 +387,7 @@ dbus (send)
     peer=(label="{snap.*,unconfined}"),
 
 # org.a11y.atspi.Cache GetItems (the GTK4 cache object the client
-# populates; mirrors desktop-legacy's T24 grant).
+# populates; mirrors desktop-legacy's cache grant).
 dbus (send)
     bus=accessibility
     path="/org/a11y/atspi/cache"
@@ -396,7 +395,7 @@ dbus (send)
     member="GetItems"
     peer=(label="{snap.*,unconfined}"),
 
-# --- tree-read sends (T29 C2 completion of the reader role): these
+# --- tree-read sends (the completion of the reader role): these
 # were previously granted ONLY by desktop-legacy; the reader role is
 # the one complete statement of the reader send-set, so they are
 # enumerated here too. org.a11y.atspi.Accessible Get* is the tree walk
@@ -405,9 +404,11 @@ dbus (send)
 # property reads (Name, Description); org.a11y.atspi.Collection
 # GetMatches the pyatspi tree search; org.a11y.atspi.Application
 # GetApplicationBusAddress the registration address fetch. Same three
-# path shapes and the same application-peer alternation as every
-# reader send above (T25: 1267 denials, all Accessible Get* at
-# /org/a11y/atspi/accessible/<n>; T26: Collection GetMatches).
+# path shapes (the classic atk-bridge numeric paths included) and the
+# same application-peer alternation as every reader send above - the
+# classic-path widening came from the live gate evidence (orca denied
+# Accessible Get* and Collection GetMatches at
+# /org/a11y/atspi/accessible/<n>).
 dbus (send)
     bus=accessibility
     path="/org/a11y/atspi/accessible/root"
@@ -471,9 +472,11 @@ dbus (send)
 
 # The reader's liveness probe of application peers: the reader pings
 # each app peer with org.freedesktop.DBus.Peer.Ping at the connection
-# root during its startup handshake (T32/T33 verbatim AVCs, 3x orca ->
-# gnome-shell on the private bus at path=/, the same shape the
-# registry's own health check uses - T24's slot-side rule). The ping
+# root during its startup handshake (the denial that motivated the
+# rule: 3x orca -> gnome-shell on the private bus at path=/, the same
+# shape the registry's own health check uses - the registry
+# DISABLES an app whose ping errors, so its slot-side rule mirrors
+# this one). The ping
 # targets application peers, so it keeps the application-peer
 # alternation of every reader send above.
 dbus (send)
@@ -543,7 +546,7 @@ const accessibilityProviderConnectedSlotAppArmor = `
 # own peers, and the remaining rules are the path/interface/member-
 # scoped app-facing join surface for desktop-legacy clients.
 #
-# Privilege placement (T29 C1): every rule here is a CONNECTED-slot
+# Privilege placement: every rule here is a CONNECTED-slot
 # grant — a slot with no connected plug contributes no rules at all,
 # and a disconnect removes all of them. The base declaration denies
 # installation of this slot unless a snap-declaration explicitly
@@ -556,15 +559,15 @@ const accessibilityProviderConnectedSlotAppArmor = `
 /sys/kernel/security/apparmor/.access   rw,
 
 # The launcher binds its bus socket on the conventional at-spi runtime
-# path (T11 §3): launch-a11y-bus overrides XDG_RUNTIME_DIR to the host
+# path: launch-a11y-bus overrides XDG_RUNTIME_DIR to the host
 # per-uid runtime dir, so unmodified client policy (desktop-legacy's
 # stock /run/user/<uid>/at-spi/bus* rule) reaches the socket and no
 # snap.* wildcard is needed anywhere.
 #
-# The socket path is part of the interface contract (T41 C8 evidence):
-# a revision that moves the socket (e.g. by overriding XDG_RUNTIME_DIR)
+# The socket path is part of the interface contract: a revision that
+# moves the socket (e.g. by overriding XDG_RUNTIME_DIR)
 # is out of contract and fails LOUDLY, not silently — the mkdir at the
-# moved path is denied (verbatim T41 AVC), the launcher's anonymous
+# moved path is denied, the launcher's anonymous
 # /tmp fallback address is unreachable by clients (desktop-legacy's
 # socket rule pins the conventional path), and clients crash-loop on
 # the dangling address. The path is deliberately NOT derived from snap
@@ -587,7 +590,7 @@ owner /run/user/[0-9]*/at-spi/** rw,
 # at-spi2-registryd, which share the bus app's profile) and unconfined
 # host processes; cross-snap clients join via their own consent path
 # (upstream: the provider-interface client rules). Derived from the
-# T19 phase-1 live matrix under real mediation.
+# phase-1 live matrix under real mediation.
 dbus (bind)
     bus=accessibility
     name=org.a11y.atspi.Registry,
@@ -598,7 +601,8 @@ dbus (send)
     bus=accessibility
     peer=(label="{snap.@{SNAP_INSTANCE_NAME}.*,unconfined}"),
 
-# Provider-to-app sends (T24 live evidence, thin image: the calculator
+# Provider-to-app sends (live evidence from the first cross-snap
+# registration: the calculator
 # registered and was then dropped from the desktop tree by the
 # registry's health check). The contract is not receive-only: the
 # registry and daemon address cross-snap clients too. All rules are
@@ -632,8 +636,9 @@ dbus (send)
 # or deregisters an event (impl_RegisterEvent / remove_events), and the
 # device event controller its keystroke-listener bookkeeping
 # (deviceeventcontroller.c: KeystrokeListener{Registered,Deregistered}
-# on the DeviceEventListener interface at the DEC path - 433 denials on
-# the T28 final bake, all registryd->gnome-shell, with the rule absent).
+# on the DeviceEventListener interface at the DEC path - the bake-wide
+# denial capture that motivated the rule was 433 denials, all
+# registryd->gnome-shell, with the rule absent).
 dbus (send)
     bus=accessibility
     path=/org/a11y/atspi/registry
@@ -647,36 +652,37 @@ dbus (send)
     member=KeystrokeListener{Registered,Deregistered}
     peer=(name=org.freedesktop.DBus, label=snap.*),
 
-# The app-facing join surface for desktop-legacy clients (T17 D1, gate
-# 2): unmodified store apps reach this provider with only their
+# The app-facing join surface for desktop-legacy clients: unmodified
+# store apps reach this provider with only their
 # desktop-legacy plug (they cannot declare per-provider plugs), so the
 # receives below mirror, for peer=(label=snap.*), exactly the messages
 # the client side grants toward this snap:
 # abstractions/dbus-accessibility-strict's driver handshake and
 # desktop-legacy's pinned org.a11y.atspi.Registry sends. Every rule is
 # scoped by path/interface/member - this is deliberately NOT the
-# unnamed tree-walking surface (T17 D3): the provider never reads app
+# unnamed tree-walking surface: the provider never reads app
 # trees; only readers do, under their own client rules.
 #
-# The consent model, stated honestly (T29 C3): the socket connect is
+# The consent model, stated honestly: the socket connect is
 # NOT a per-provider consent act — desktop-legacy auto-connects for
 # every store snap, so the only peers denied at the socket are snaps
-# without desktop-legacy (the must-deny; gate 7 proves exactly that
-# trivial case). Admission to the bus therefore means "any GUI snap".
+# without desktop-legacy (a consent-less snap's connect() to the
+# private bus is denied with EACCES). Admission to the bus therefore
+# means "any GUI snap".
 # What gates the PRIVILEGED access on top of admission:
 #   - installation of this slot: denied by the base declaration unless
-#     a snap-declaration allows it (T29 C1);
+#     a snap-declaration allows it;
 #   - every rule in this snippet: rides the connection (removed on
 #     disconnect);
 #   - tree reads across snaps: a reader grant — the a11y client
 #     receive in desktop-legacy admits reader-surface calls only from
 #     reader-role senders (kernel-checked on the sender side) or the
-#     provider's label (T29 C2);
+#     provider's label;
 #   - the session-bus GetAddress path: the only leg still behind an
 #     explicit plug consent (dbus-a11y-bus-client), wired manually.
 
-# Live evidence (thin image, a11y x2, snapd g61): gnome-calculator,
-# gnome-shell and xdg-desktop-portal-gtk all connect to the private bus
+# Live evidence (the first cross-snap gate, from the running desktop):
+# gnome-calculator, gnome-shell and xdg-desktop-portal-gtk all connect to the private bus
 # socket and are denied at the Hello receive (mask=receive
 # label=snap.ubuntu-desktop-a11y.bus peer_label=<client>), while the
 # session-bus GetAddress passes both sides - the join was the wall.
@@ -765,8 +771,8 @@ const accessibilityProviderConnectedSlotSecComp = `
 # (kernel 6.8+), libapparmor treats the EPERM as "syscall present but
 # denied at the hook level" and does NOT fall back to /proc/<pid>/attr,
 # and the bus exits with "Error getting AppArmor context of bus"
-# (T19 phase-1 capture). Read-only use; lsm_set_self_attr stays denied.
-# Connected-slot grant (T29 C1): rides the connection like every other
+# (phase-1 capture under real mediation). Read-only use; lsm_set_self_attr stays denied.
+# Connected-slot grant: rides the connection like every other
 # provider privilege.
 lsm_get_self_attr
 `
