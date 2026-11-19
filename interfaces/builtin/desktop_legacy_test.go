@@ -84,6 +84,101 @@ func (s *DesktopLegacyInterfaceSuite) TestAppArmorSpec(c *C) {
 	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, `peer=(addr="@/tmp/ibus/dbus-*"),`)
 	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, `deny /var/lib/snapd/desktop/applications/mimeinfo.cache r,`)
 
+	// a11y provider peers (T17 D3): the org.a11y.Bus owner (session
+	// bus) and the registry (private bus) are pinned to the provider's
+	// label plus the legacy unconfined provider; name ownership does
+	// not enforce the role (D4), so the pin replaces 1826bfd5af's
+	// generic snap.* reach
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "interface=org.a11y.Bus\n    member=GetAddress\n    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	// the session-bus status read surface (T24): reads only, scoped to
+	// the served object path - no Set for confined clients
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "path=/org/a11y/bus\n    interface=org.freedesktop.DBus.Properties\n    member={Get,GetAll}\n    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "path=/org/a11y/bus\n    interface=org.freedesktop.DBus.Introspectable\n    member=Introspect\n    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	// ... for the narrowed client receives on the accessibility bus
+	// (T29 C2): the unnamed catch-all receive is GONE. What remains,
+	// per surface:
+	// 1. provider-lifecycle receives pinned to the provider's label
+	//    (driver bus-lifecycle signals, the registry's Ping health
+	//    check, the Id assignment, listener bookkeeping, delivered key
+	//    events)
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"interface=org.freedesktop.DBus\n"+
+			"    member={NameAcquired,NameLost,NameOwnerChanged}\n"+
+			"    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"dbus (receive)\n    bus=accessibility\n    path=/\n"+
+			"    interface=org.freedesktop.DBus.Peer\n    member=Ping\n"+
+			"    peer=(label=\"{snap.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"member=EventListener{Registered,Deregistered}\n"+
+			"    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"member=NotifyListeners{Sync,Async}\n"+
+			"    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	// 2a. reader-ROLE-only interfaces: accepted from any peer - the
+	//     kernel checks the sender side too and ONLY reader-granted
+	//     profiles carry those sends
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"path=\"/org/a11y/atspi/accessible/[0-9]*\"\n"+
+			"    interface=\"{org.a11y.atspi.Text,org.a11y.atspi.EditableText,org.a11y.atspi.Action,org.a11y.atspi.Component,org.a11y.atspi.Selection,org.a11y.atspi.Hypertext,org.a11y.atspi.Hyperlink,org.a11y.atspi.Document,org.a11y.atspi.Table,org.a11y.atspi.TableCell}\"\n"+
+			"    peer=(label=\"{snap.*,unconfined}\"),")
+	// 2b. desktop-legacy-shared read surfaces: PINNED to the provider's
+	//     label (the send side cannot discriminate - a desktop-legacy-
+	//     only snap holds the same sends, so the receive is the wall)
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"path=\"/org/a11y/atspi/accessible/[0-9]*\"\n"+
+			"    interface=\"{org.a11y.atspi.Accessible,org.a11y.atspi.Application,org.freedesktop.DBus.Properties,org.a11y.atspi.Collection,org.a11y.atspi.Cache}\"\n"+
+			"    member=\"Get*\"\n"+
+			"    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"path=\"/**/a11y/*\"\n"+
+			"    interface=org.freedesktop.DBus.Properties\n"+
+			"    member=Set\n"+
+			"    peer=(label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	// 3. event/cache broadcasts: the shared trust domain (C5's
+	//    documented accepted risk)
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains,
+		"dbus (receive)\n    bus=accessibility\n"+
+			"    interface=org.a11y.atspi.Event.Object\n"+
+			"    peer=(label=\"{snap.*,unconfined}\"),")
+	// and the D3 line: NO unnamed receive on the private bus survives
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains),
+		"dbus (receive)\n    bus=accessibility\n    peer=")
+	// ... and for the registry sends (the registry lives in the
+	// provider's label with a confined provider, unconfined on the fat
+	// base)
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "member=\"Embed\"\n    peer=(name=org.a11y.atspi.Registry, label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	// T45 (owner ruling): the pre-reader-role desktop-legacy READ sends
+	// are DROPPED — the reader role (the accessibility-provider
+	// connected plug) is the one complete statement of the reader
+	// send-set, so desktop-legacy no longer grants the tree reads
+	// (Accessible Get*, Properties Get{,All}, Collection GetMatches,
+	// Application GetApplicationBusAddress) toward {snap.*,unconfined}
+	// at any path shape. Assert their ABSENCE (a desktop-legacy-only
+	// consumer profile must carry ZERO read-send rules to non-own
+	// peers — the T45 mechanical audit criterion).
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains), "interface=\"org.a11y.atspi.Accessible\"\n    member=\"Get*\"\n    peer=(label=\"{snap.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains), "interface=\"org.freedesktop.DBus.Properties\"\n    member=\"Get{,All}\"\n    peer=(label=\"{snap.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains), "interface=\"org.a11y.atspi.Collection\"\n    member=\"GetMatches\"\n    peer=(label=\"{snap.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains), "interface=\"org.a11y.atspi.Application\"\n    member=\"GetApplicationBusAddress\"\n    peer=(label=\"{snap.*,unconfined}\"),")
+	// the event broadcasts are interface-scoped and STAY (the C5
+	// accepted-risk class); the cache send is NARROWED to the
+	// broadcasts (Add/RemoveAccessible) — the GetItems unicast READ
+	// half is dropped (the reader role grants it member-scoped)
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "path=\"/org/a11y/atspi/cache\"\n    interface=\"org.a11y.atspi.Cache\"\n    member=\"{AddAccessible,RemoveAccessible}\"\n    peer=(label=\"{snap.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains), "path=\"/org/a11y/atspi/cache\"\n    interface=\"org.a11y.atspi.Cache\"\n    peer=")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "path=\"/**/a11y/*\"\n    interface=\"org.a11y.atspi.Event.Object\"\n    peer=(name=org.freedesktop.DBus, label=\"{snap.*,unconfined}\"),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "member=\"GetRegisteredEvents\"\n    peer=(name=org.a11y.atspi.Registry, label=\"{snap.ubuntu-desktop-a11y.*,unconfined}\"),")
+	// T17 D2: no snap.* at-spi socket rule - the provider binds the
+	// conventional path, and a snap.* wildcard would admit every
+	// snap's socket (X11-property redirection)
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains), `snap.*/at-spi/bus*`)
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, `owner /{,var/}run/user/[0-9]*/at-spi/bus* rw,`)
+	// the peer widening is scoped to the a11y member set: session-bus
+	// services (e.g. notifications) keep the plain unconfined peer
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, "member=\"{GetCapabilities,GetServerInformation,Notify,CloseNotification}\"\n    peer=(label=unconfined),")
+	c.Assert(spec.SnippetForTag("snap.consumer.app"), Not(testutil.Contains), "bus=session\n    peer=(label=\"{snap.*,unconfined}\"),")
+
 	// getDesktopFileRules() rules
 	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, `# This leaks the names of snaps with desktop files`)
 	c.Assert(spec.SnippetForTag("snap.consumer.app"), testutil.Contains, `/var/lib/snapd/desktop/applications/ r,`)
