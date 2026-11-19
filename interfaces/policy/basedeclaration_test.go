@@ -251,6 +251,9 @@ func (s *baseDeclSuite) TestAutoConnectPlugSlot(c *C) {
 		"lxd-support":     true,
 		// netlink-driver needs the family-name attributes to match
 		"netlink-driver": true,
+		// the reader/provider capability is never auto-connected
+		// (T30; deny-auto-connection in the base declaration)
+		"accessibility-provider": true,
 	}
 
 	for _, iface := range all {
@@ -827,6 +830,10 @@ plugs:
 var (
 	slotInstallation = map[string][]string{
 		// other
+		// nil: allow-installation: false (T30 reader role + T29 C1) -
+		// installation only via a snap-declaration grant; tested
+		// specially below
+		"accessibility-provider":    nil,
 		"accountsservice":           {"app"},
 		"adb-support":               {"core"},
 		"audio-playback":            {"app", "core"},
@@ -1039,6 +1046,22 @@ slots:
 	c.Assert(err, Not(IsNil))
 	c.Assert(err, ErrorMatches, "installation denied by \"shared-memory\" slot rule of interface \"shared-memory\"")
 
+	// test accessibility-provider specially (T29 C1): allow-installation
+	// false - no snap type may install the slot; only a snap-declaration
+	// grant can lift it. The minimal check used for --dangerous installs
+	// ignores the deny/allow rules (custom-device posture), so local
+	// testing is unaffected.
+	ic = s.installSlotCand(c, "accessibility-provider", snap.TypeApp, ``)
+	err = ic.Check()
+	c.Assert(err, Not(IsNil))
+	c.Assert(err, ErrorMatches, "installation not allowed by \"accessibility-provider\" slot rule of interface \"accessibility-provider\"")
+	icMin = &policy.InstallCandidateMinimalCheck{
+		Snap:            ic.Snap,
+		BaseDeclaration: s.baseDecl,
+	}
+	err = icMin.Check()
+	c.Assert(err, IsNil)
+
 	// test gpio-chardev specifically as it needs correct attributes in the snap yaml
 	for name, snapType := range snapTypeMap {
 		ic := s.installSlotCand(c, "gpio-chardev", snapType, fmt.Sprintf(`name: my-device
@@ -1107,6 +1130,8 @@ func (s *baseDeclSuite) TestPlugInstallation(c *C) {
 		"checkbox-support":                 true,
 		"classic-support":                  true,
 		"cuda-driver-libs":                 true,
+		// the reader role is install-gated (T30)
+		"accessibility-provider":           true,
 		"desktop-launch":                   true,
 		"dm-crypt":                         true,
 		"docker-support":                   true,
@@ -1420,6 +1445,9 @@ func (s *baseDeclSuite) TestValidity(c *C) {
 	// listed here to make sure that was a conscious decision
 	bothSides := map[string]bool{
 		"auditd-support":                   true,
+		// the reader role (plug) and the provider capability (slot):
+		// both sides carry base-declaration rules (T30)
+		"accessibility-provider":           true,
 		"block-devices":                    true,
 		"audio-playback":                   true,
 		"classic-support":                  true,
