@@ -419,6 +419,23 @@ func (s *DbusInterfaceSuite) TestConnectedSlotAppArmorSession(c *C) {
 
 	// verify interface in rule
 	c.Check(snippet, testutil.Contains, "interface=\"org.test-session-connected{,.*}\"\n")
+
+	// session-bus slots carry the unconfined-peer receive rules (T17
+	// D6: session-bus only) and the name-scoped confined-peer receive
+	// variant (T17 D1: store apps cannot declare per-provider plugs)
+	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    interface=org.freedesktop.DBus.Introspectable\n    member=Introspect\n    peer=(label=unconfined),\n")
+	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    interface=\"org.test-session-connected{,.*}\"\n    peer=(label=unconfined),\n")
+	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    path=\"/org/test-session-connected{,/**}\"\n    peer=(label=unconfined),\n")
+	// T17 D1: the confined-peer receive rule is interface-scoped and
+	// receive-only; the name-scoped sketch cannot exist (AppArmor 5
+	// forbids name= on send/receive rules)
+	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    interface=\"org.test-session-connected{,.*}\"\n    peer=(label=snap.*),\n")
+	c.Check(snippet, Not(testutil.Contains), "name=org.test-session-connected\n    peer=")
+	c.Check(snippet, Not(testutil.Contains), `peer=(label="{snap.*}"),`)
+	c.Check(snippet, Not(testutil.Contains), "dbus (receive, send)\n    bus=session\n    interface=\"org.test-session-connected{,.*}\"\n    peer=(label=snap.*),")
+	// unconfined peers are receive-only, same as the classic
+	// permanent-slot block
+	c.Check(snippet, Not(testutil.Contains), "dbus (receive, send)\n    bus=session\n    interface=\"org.test-session-connected{,.*}\"\n    peer=(label=unconfined),\n")
 }
 
 func (s *DbusInterfaceSuite) TestConnectedSlotAppArmorSystem(c *C) {
@@ -439,6 +456,15 @@ func (s *DbusInterfaceSuite) TestConnectedSlotAppArmorSystem(c *C) {
 
 	// verify interface in rule
 	c.Check(snippet, testutil.Contains, "interface=\"org.test-system-connected{,.*}\"\n")
+
+	// T17 D6 NEGATIVE: the unconfined-peer and confined-peer receive
+	// blocks are session-bus only; a system-bus slot must not grant
+	// unconfined (or arbitrary-snap) peers access (an unconfined peer
+	// can be any non-root local process, an SSH session included, and
+	// the dbus base declaration does not constrain slot names beyond
+	// the service itself)
+	c.Check(snippet, Not(testutil.Contains), "peer=(label=unconfined),")
+	c.Check(snippet, Not(testutil.Contains), "peer=(label=snap.*),")
 }
 
 func (s *DbusInterfaceSuite) TestConnectedPlugAppArmorSession(c *C) {

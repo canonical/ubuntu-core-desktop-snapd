@@ -189,6 +189,63 @@ dbus (receive, send)
     bus=###DBUS_BUS###
     path=###DBUS_PATH###
     peer=(label=###PLUG_SECURITY_TAGS###),
+
+# allow unconfined clients to introspect us and to respond via
+# ###DBUS_INTERFACE### / ###DBUS_PATH###. Desktop sessions run unconfined
+# processes everywhere (host at-spi bridges, orca, CLI tools, gdm
+# helpers), and an unconfined peer can never match a plug label
+# expression, so a connected slot service would otherwise be uncallable
+# from the host session (gate-1 evidence: GetAddress receive denied,
+# label=snap.<provider>.<app> peer_label=unconfined). This is the same
+# grant the permanent slot snippet already ships on classic, and the
+# connection itself is the consent act (deny-auto-connection is the
+# base declaration default for this interface). Send by unconfined
+# clients needs no rule (unconfined profiles are not mediated).
+# Session-bus only (T17 D6): upstream ships the unconfined-peer block
+# in dbusPermanentSlotAppArmorClassic only for classic, where every
+# session service is exposed this way; on the system bus the same
+# block would hand every unconfined local process (any non-root user,
+# an SSH session included) access to connected privileged services,
+# which upstream's classic-only gating deliberately excludes.
+`
+
+// dbusConnectedSlotAppArmorSession carries the session-bus-only peer
+// rules for connected slots (see the comment inside
+// dbusConnectedSlotAppArmor for the unconfined block's rationale and
+// the D6 scoping). The final rule admits receives from any CONFINED
+// snap for messages on this slot's own interface (T17 D1): unmodified
+// store apps cannot declare per-provider plugs and desktop-legacy
+// clients must reach their providers without republishing every app.
+// Receive-only. Two scoping notes: AppArmor 5 forbids name= on
+// send/receive rules (service conditionals are bind-only, verified
+// against the shipped apparmor_parser 5.0.2), so the T17 sketch's
+// name-scoped rule is not expressible; and the name-derived
+// ###DBUS_PATH### is the name with dots replaced by slashes, which for
+// at-spi mismatches the served object path (/org/a11y/Bus vs the real
+// /org/a11y/bus), so the rule is scoped by interface - the live-matrix
+// discriminator (T16 check b proved the interface rule carries the
+// a11y GetAddress receive). The system bus stays plug- and
+// unconfined-only.
+const dbusConnectedSlotAppArmorSession = `dbus (receive)
+    bus=###DBUS_BUS###
+    interface=org.freedesktop.DBus.Introspectable
+    member=Introspect
+    peer=(label=unconfined),
+
+dbus (receive)
+    bus=###DBUS_BUS###
+    interface=###DBUS_INTERFACE###
+    peer=(label=unconfined),
+
+dbus (receive)
+    bus=###DBUS_BUS###
+    path=###DBUS_PATH###
+    peer=(label=unconfined),
+
+dbus (receive)
+    bus=###DBUS_BUS###
+    interface=###DBUS_INTERFACE###
+    peer=(label=snap.*),
 `
 
 const dbusConnectedPlugAppArmor = `
@@ -441,6 +498,12 @@ func (iface *dbusInterface) AppArmorConnectedSlot(spec *apparmor.Specification, 
 
 	// well-known DBus name-specific connected slot policy
 	snippet := getAppArmorSnippet(dbusConnectedSlotAppArmor, bus, name)
+	if bus == "session" {
+		// unconfined- and confined-peer receive rules are
+		// session-bus only (T17 D6/D1); system-bus slots keep
+		// plug-tag-scoped peers only
+		snippet += getAppArmorSnippet(dbusConnectedSlotAppArmorSession, bus, name)
+	}
 
 	old := "###PLUG_SECURITY_TAGS###"
 	new := plug.LabelExpression()
