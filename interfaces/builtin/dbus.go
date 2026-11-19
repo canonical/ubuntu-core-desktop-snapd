@@ -35,22 +35,26 @@ import (
 
 const dbusSummary = `allows owning a specific name on DBus`
 
-// Name reservation (T29 C6, the T17 D4 / T28 item-4 fix): the
-// accessibility bus name org.a11y.Bus is RESERVED at the base
-// declaration level — no snap can INSTALL a dbus slot claiming it
-// unless its snap-declaration explicitly allows that. Without this,
-// any app snap could declare slots: {x: {interface: dbus, name:
-// org.a11y.Bus}} and become the activation target for the
-// accessibility bus (confined clients are already pinned to the
-// provider's label for GetAddress, but unconfined launchers and
-// gsd/session pieces resolve the name by ownership and would reach
-// the squatter). The attribute value is a regex (anchored), hence the
-// escaped dots. Two scope notes: --dangerous sideloads pass snapd's
-// minimal candidate check, which ignores deny rules — local testing
-// of a provider snap is unaffected; a legitimately-declared provider
-// snap in the store is granted through its own snap-declaration dbus
-// slot rule (per-snap rules replace the base rule), which is exactly
-// the review-required store-level control.
+// Name reservation: the accessibility bus namespace is RESERVED at
+// the base declaration level — no snap can INSTALL a dbus slot whose
+// name falls under org.a11y (org.a11y itself, org.a11y.Bus, or
+// anything below org.a11y.*) unless its snap-declaration explicitly
+// allows that. Without this, any app snap could declare slots: {x:
+// {interface: dbus, name: org.a11y}} and become the activation target
+// for the accessibility bus: the generated permanent-slot bind rule
+// name="NAME.*" lets a slot named org.a11y own org.a11y.Bus at
+// runtime, so an exact-name match on the reserved name alone would
+// leave a prefix-bypass hole. (Confined clients are already pinned to
+// the provider's label for GetAddress, but unconfined launchers and
+// the session pieces resolve the name by ownership and would reach
+// the squatter.) The attribute value is a regex (anchored at both
+// ends), hence the escaped dots. Two scope notes: --dangerous
+// sideloads pass snapd's minimal candidate check, which ignores deny
+// rules — local testing of a provider snap is unaffected; a
+// legitimately-declared provider snap in the store is granted through
+// its own snap-declaration dbus slot rule (per-snap rules replace the
+// base rule), which is exactly the store-level control the review
+// requires.
 const dbusBaseDeclarationSlots = `
   dbus:
     allow-installation:
@@ -58,7 +62,7 @@ const dbusBaseDeclarationSlots = `
         - app
     deny-installation:
       slot-attributes:
-        name: org\.a11y\.Bus
+        name: org\.a11y(\..*)?
     deny-connection:
       slot-attributes:
         name: .+

@@ -1108,6 +1108,36 @@ slots:
 `)
 	c.Assert(ic.Check(), IsNil)
 
+	// the prefix bypass is closed too: a slot named org.a11y generates
+	// bind name="org.a11y.*", which owns org.a11y.Bus at runtime, so
+	// the reservation must cover every name whose expansion reaches the
+	// reserved namespace - org.a11y itself ...
+	ic = s.installSlotCand(c, "dbus", snap.TypeApp, `name: a11y-prefix-squatter
+version: 0
+type: app
+slots:
+  bus:
+    interface: dbus
+    bus: session
+    name: org.a11y
+`)
+	err = ic.Check()
+	c.Assert(err, Not(IsNil))
+	c.Assert(err, ErrorMatches, `installation denied by "bus" slot rule of interface "dbus"`)
+	// ... and any name below the reserved namespace
+	ic = s.installSlotCand(c, "dbus", snap.TypeApp, `name: a11y-child-squatter
+version: 0
+type: app
+slots:
+  bus:
+    interface: dbus
+    bus: session
+    name: org.a11y.Bus.Foo
+`)
+	err = ic.Check()
+	c.Assert(err, Not(IsNil))
+	c.Assert(err, ErrorMatches, `installation denied by "bus" slot rule of interface "dbus"`)
+
 	// test gpio-chardev specifically as it needs correct attributes in the snap yaml
 	for name, snapType := range snapTypeMap {
 		ic := s.installSlotCand(c, "gpio-chardev", snapType, fmt.Sprintf(`name: my-device
