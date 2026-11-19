@@ -35,11 +35,30 @@ import (
 
 const dbusSummary = `allows owning a specific name on DBus`
 
+// Name reservation (T29 C6, the T17 D4 / T28 item-4 fix): the
+// accessibility bus name org.a11y.Bus is RESERVED at the base
+// declaration level — no snap can INSTALL a dbus slot claiming it
+// unless its snap-declaration explicitly allows that. Without this,
+// any app snap could declare slots: {x: {interface: dbus, name:
+// org.a11y.Bus}} and become the activation target for the
+// accessibility bus (confined clients are already pinned to the
+// provider's label for GetAddress, but unconfined launchers and
+// gsd/session pieces resolve the name by ownership and would reach
+// the squatter). The attribute value is a regex (anchored), hence the
+// escaped dots. Two scope notes: --dangerous sideloads pass snapd's
+// minimal candidate check, which ignores deny rules — local testing
+// of a provider snap is unaffected; a legitimately-declared provider
+// snap in the store is granted through its own snap-declaration dbus
+// slot rule (per-snap rules replace the base rule), which is exactly
+// the review-required store-level control.
 const dbusBaseDeclarationSlots = `
   dbus:
     allow-installation:
       slot-snap-type:
         - app
+    deny-installation:
+      slot-attributes:
+        name: org\.a11y\.Bus
     deny-connection:
       slot-attributes:
         name: .+

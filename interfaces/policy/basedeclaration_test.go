@@ -1062,6 +1062,52 @@ slots:
 	err = icMin.Check()
 	c.Assert(err, IsNil)
 
+	// test the dbus org.a11y.Bus reservation specially (T29 C6): an app
+	// snap declaring a dbus slot with the accessibility bus name is
+	// DENIED by the base declaration deny-installation rule...
+	ic = s.installSlotCand(c, "dbus", snap.TypeApp, `name: a11y-squatter
+version: 0
+type: app
+slots:
+  bus:
+    interface: dbus
+    bus: session
+    name: org.a11y.Bus
+`)
+	err = ic.Check()
+	c.Assert(err, Not(IsNil))
+	c.Assert(err, ErrorMatches, `installation denied by "bus" slot rule of interface "dbus"`)
+	// ... the minimal check used for --dangerous sideloads ignores the
+	// deny rule (the a11y provider snap's own sideloads are unaffected)
+	icMin = &policy.InstallCandidateMinimalCheck{
+		Snap:            ic.Snap,
+		BaseDeclaration: s.baseDecl,
+	}
+	err = icMin.Check()
+	c.Assert(err, IsNil)
+	// ... other dbus names are not reserved
+	ic = s.installSlotCand(c, "dbus", snap.TypeApp, `name: plain-service
+version: 0
+type: app
+slots:
+  svc:
+    interface: dbus
+    bus: session
+    name: org.example.Service
+`)
+	c.Assert(ic.Check(), IsNil)
+	// and the regex is anchored: lookalike names are NOT matched
+	ic = s.installSlotCand(c, "dbus", snap.TypeApp, `name: plain-service2
+version: 0
+type: app
+slots:
+  svc:
+    interface: dbus
+    bus: session
+    name: orgXa11yXBus
+`)
+	c.Assert(ic.Check(), IsNil)
+
 	// test gpio-chardev specifically as it needs correct attributes in the snap yaml
 	for name, snapType := range snapTypeMap {
 		ic := s.installSlotCand(c, "gpio-chardev", snapType, fmt.Sprintf(`name: my-device
