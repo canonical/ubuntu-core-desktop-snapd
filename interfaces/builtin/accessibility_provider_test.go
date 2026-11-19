@@ -20,6 +20,8 @@
 package builtin_test
 
 import (
+	"strings"
+
 	. "gopkg.in/check.v1"
 
 	"github.com/snapcore/snapd/interfaces"
@@ -154,6 +156,16 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedSlotAppArmor(c *C) {
 		"dbus (receive)\n    bus=session\n    path=/org/a11y/bus\n"+
 			"    interface=org.freedesktop.DBus.Introspectable\n    member=Introspect\n"+
 			"    peer=(label=\"{snap.*,unconfined}\"),\n")
+	// the session-bus GetAddress surface for desktop-legacy clients:
+	// receive-only, scoped to the one method the a11y join needs, at
+	// the served object path, confined peers only (the generic dbus
+	// connected-slot rules do not admit confined peers interface-wide,
+	// and unconfined callers are covered by the generic unconfined
+	// block)
+	c.Assert(snippet, testutil.Contains,
+		"dbus (receive)\n    bus=session\n    path=/org/a11y/bus\n"+
+			"    interface=org.a11y.Bus\n    member=GetAddress\n"+
+			"    peer=(label=snap.*),\n")
 	// the provider-to-app sends the registration contract needs (T24):
 	// the registry's 30s Peer.Ping health check (an app whose ping
 	// errors is DISABLED and removed from the desktop tree), the
@@ -282,7 +294,16 @@ func (s *AccessibilityProviderInterfaceSuite) TestConnectedPlugAppArmor(c *C) {
 	// no registry receives beyond the provider slot's own:
 	c.Assert(snippet, Not(testutil.Contains), "dbus (receive)")
 	c.Assert(snippet, Not(testutil.Contains), "bus=system")
-	c.Assert(snippet, Not(testutil.Contains), "peer=(label=\"{snap.ubuntu-desktop-a11y.*")
+	// every provider-label peer rule in the plug snippet is
+	// registry-name-scoped (peer=(name=org.a11y.atspi.Registry,
+	// label="{snap.ubuntu-desktop-a11y.*,unconfined}")): the reader
+	// talks to the provider's registry only, never to arbitrary
+	// provider-label peers. (A plain "Not(Contains)" on the label
+	// substring would be vacuous here — the registry rules themselves
+	// carry it after the name condition — so the invariant is checked
+	// by count.)
+	c.Assert(strings.Count(snippet, `label="{snap.ubuntu-desktop-a11y.*`),
+		Equals, strings.Count(snippet, `peer=(name=org.a11y.atspi.Registry, `))
 }
 
 func (s *AccessibilityProviderInterfaceSuite) TestSecCompPermanentSlotEmpty(c *C) {

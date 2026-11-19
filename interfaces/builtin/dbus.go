@@ -235,20 +235,20 @@ dbus (receive, send)
 // dbusConnectedSlotAppArmorSession carries the session-bus-only peer
 // rules for connected slots (see the comment inside
 // dbusConnectedSlotAppArmor for the unconfined block's rationale and
-// the D6 scoping). The final rule admits receives from any CONFINED
-// snap for messages on this slot's own interface (T17 D1): unmodified
-// store apps cannot declare per-provider plugs and desktop-legacy
-// clients must reach their providers without republishing every app.
-// Receive-only. Two scoping notes: AppArmor 5 forbids name= on
-// send/receive rules (service conditionals are bind-only, verified
-// against the shipped apparmor_parser 5.0.2), so the T17 sketch's
-// name-scoped rule is not expressible; and the name-derived
-// ###DBUS_PATH### is the name with dots replaced by slashes, which for
-// at-spi mismatches the served object path (/org/a11y/Bus vs the real
-// /org/a11y/bus), so the rule is scoped by interface - the live-matrix
-// discriminator (T16 check b proved the interface rule carries the
-// a11y GetAddress receive). The system bus stays plug- and
-// unconfined-only.
+// the D6 scoping). The rules keep upstream's two-sided check for
+// confined peers: a confined snap reaches a connected slot's service
+// only through a receive rule the slot's own interface grants — the
+// generic dbus snippets do NOT admit confined peers interface-wide.
+// Interfaces that need a specific confined-client surface (e.g. the
+// accessibility provider's GetAddress for desktop-legacy clients,
+// which cannot declare per-provider plugs) carry their own scoped
+// receive rule in their connected-slot snippet. Scoping notes: no
+// peer label can ever match unconfined, so the unconfined block is
+// the only way unconfined clients reach a connected slot service; and
+// AppArmor 5 forbids name= on send/receive rules (service
+// conditionals are bind-only, verified against the shipped
+// apparmor_parser 5.0.2), so any such scoped rule must be
+// path/interface/member-scoped instead.
 const dbusConnectedSlotAppArmorSession = `dbus (receive)
     bus=###DBUS_BUS###
     interface=org.freedesktop.DBus.Introspectable
@@ -264,11 +264,6 @@ dbus (receive)
     bus=###DBUS_BUS###
     path=###DBUS_PATH###
     peer=(label=unconfined),
-
-dbus (receive)
-    bus=###DBUS_BUS###
-    interface=###DBUS_INTERFACE###
-    peer=(label=snap.*),
 `
 
 const dbusConnectedPlugAppArmor = `

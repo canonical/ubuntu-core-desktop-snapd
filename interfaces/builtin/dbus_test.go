@@ -421,15 +421,18 @@ func (s *DbusInterfaceSuite) TestConnectedSlotAppArmorSession(c *C) {
 	c.Check(snippet, testutil.Contains, "interface=\"org.test-session-connected{,.*}\"\n")
 
 	// session-bus slots carry the unconfined-peer receive rules (T17
-	// D6: session-bus only) and the name-scoped confined-peer receive
-	// variant (T17 D1: store apps cannot declare per-provider plugs)
+	// D6: session-bus only). Confined peers keep the two-sided check:
+	// the generic connected-slot snippet must NOT admit them
+	// interface-wide — interfaces that need a confined-client surface
+	// carry their own scoped receive rule (the accessibility-provider
+	// slot's GetAddress rule is that case)
 	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    interface=org.freedesktop.DBus.Introspectable\n    member=Introspect\n    peer=(label=unconfined),\n")
 	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    interface=\"org.test-session-connected{,.*}\"\n    peer=(label=unconfined),\n")
 	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    path=\"/org/test-session-connected{,/**}\"\n    peer=(label=unconfined),\n")
-	// T17 D1: the confined-peer receive rule is interface-scoped and
-	// receive-only; the name-scoped sketch cannot exist (AppArmor 5
-	// forbids name= on send/receive rules)
-	c.Check(snippet, testutil.Contains, "dbus (receive)\n    bus=session\n    interface=\"org.test-session-connected{,.*}\"\n    peer=(label=snap.*),\n")
+	// no confined-peer receive of any shape on the generic slot snippet
+	// (receive-only, interface-scoped, or path-scoped)
+	c.Check(snippet, Not(testutil.Contains), "peer=(label=snap.*),")
+	c.Check(snippet, Not(testutil.Contains), `peer=(label="{snap.*,unconfined}"),`)
 	c.Check(snippet, Not(testutil.Contains), "name=org.test-session-connected\n    peer=")
 	c.Check(snippet, Not(testutil.Contains), `peer=(label="{snap.*}"),`)
 	c.Check(snippet, Not(testutil.Contains), "dbus (receive, send)\n    bus=session\n    interface=\"org.test-session-connected{,.*}\"\n    peer=(label=snap.*),")

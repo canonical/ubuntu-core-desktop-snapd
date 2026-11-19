@@ -737,6 +737,24 @@ dbus (receive)
     interface=org.freedesktop.DBus.Introspectable
     member=Introspect
     peer=(label="{snap.*,unconfined}"),
+
+# The session-bus GetAddress surface for desktop-legacy clients.
+# desktop-legacy clients cannot declare per-provider plugs, so they
+# reach the provider through this receive-only rule; it is scoped to
+# the one method the a11y join needs on the session bus, at the served
+# object path. The generic dbus connected-slot rules do NOT admit
+# confined peers interface-wide (that would remove the receive half of
+# the dbus two-sided check for every session dbus slot on the system),
+# so the provider interface carries this surface itself. Every other
+# member of org.a11y.Bus stays behind the plug's own connection
+# consent, and unconfined callers are covered by the generic
+# unconfined-peer block.
+dbus (receive)
+    bus=session
+    path=/org/a11y/bus
+    interface=org.a11y.Bus
+    member=GetAddress
+    peer=(label=snap.*),
 `
 
 const accessibilityProviderConnectedSlotSecComp = `
