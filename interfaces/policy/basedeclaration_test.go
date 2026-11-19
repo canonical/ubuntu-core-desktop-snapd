@@ -1171,13 +1171,13 @@ func (s *baseDeclSuite) TestPlugInstallation(c *C) {
 	all := builtin.Interfaces()
 
 	restricted := map[string]bool{
+		// the reader role is install-gated (T30)
+		"accessibility-provider":           true,
 		"auditd-support":                   true,
 		"block-devices":                    true,
 		"checkbox-support":                 true,
 		"classic-support":                  true,
 		"cuda-driver-libs":                 true,
-		// the reader role is install-gated (T30)
-		"accessibility-provider":           true,
 		"desktop-launch":                   true,
 		"dm-crypt":                         true,
 		"docker-support":                   true,
@@ -1490,10 +1490,10 @@ func (s *baseDeclSuite) TestValidity(c *C) {
 	// given how the rules work this can be delicate,
 	// listed here to make sure that was a conscious decision
 	bothSides := map[string]bool{
-		"auditd-support":                   true,
 		// the reader role (plug) and the provider capability (slot):
 		// both sides carry base-declaration rules (T30)
 		"accessibility-provider":           true,
+		"auditd-support":                   true,
 		"block-devices":                    true,
 		"audio-playback":                   true,
 		"classic-support":                  true,
