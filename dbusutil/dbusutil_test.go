@@ -93,6 +93,50 @@ func (*dbusutilSuite) TestSessionBusWithoutBus(c *C) {
 	c.Assert(err, ErrorMatches, "cannot find session bus")
 }
 
+func (*dbusutilSuite) TestMaybeExportSessionBusAddressFromSocket(c *C) {
+	f := fmt.Sprintf("%s/%d/bus", dirs.XdgRuntimeDirBase, os.Getuid())
+	c.Assert(os.MkdirAll(filepath.Dir(f), 0755), IsNil)
+	l, err := net.Listen("unix", f)
+	c.Assert(err, IsNil)
+	defer l.Close()
+
+	// SetUpTest unset the env var: the export fills it in from the
+	// per-user socket
+	dbusutil.MaybeExportSessionBusAddress()
+	defer os.Unsetenv(envVar)
+	c.Assert(os.Getenv(envVar), Equals, "unix:path="+f)
+}
+
+func (*dbusutilSuite) TestMaybeExportSessionBusAddressNotASocket(c *C) {
+	// a regular file at the per-user path is not a bus: no export
+	f := fmt.Sprintf("%s/%d/bus", dirs.XdgRuntimeDirBase, os.Getuid())
+	c.Assert(os.MkdirAll(filepath.Dir(f), 0755), IsNil)
+	c.Assert(os.WriteFile(f, []byte("not a socket"), 0644), IsNil)
+
+	dbusutil.MaybeExportSessionBusAddress()
+	c.Assert(os.Getenv(envVar), Equals, "")
+}
+
+func (*dbusutilSuite) TestMaybeExportSessionBusAddressNothingThere(c *C) {
+	// nothing at the per-user path at all: no export
+	dbusutil.MaybeExportSessionBusAddress()
+	c.Assert(os.Getenv(envVar), Equals, "")
+}
+
+func (*dbusutilSuite) TestMaybeExportSessionBusAddressAlreadySet(c *C) {
+	f := fmt.Sprintf("%s/%d/bus", dirs.XdgRuntimeDirBase, os.Getuid())
+	c.Assert(os.MkdirAll(filepath.Dir(f), 0755), IsNil)
+	l, err := net.Listen("unix", f)
+	c.Assert(err, IsNil)
+	defer l.Close()
+	c.Assert(os.Setenv(envVar, "unix:path=/already/advertised"), IsNil)
+	defer os.Unsetenv(envVar)
+
+	// an explicitly advertised address always wins
+	dbusutil.MaybeExportSessionBusAddress()
+	c.Assert(os.Getenv(envVar), Equals, "unix:path=/already/advertised")
+}
+
 func (*dbusutilSuite) TestMockOnlySessionBusAvailable(c *C) {
 	stub, err := dbustest.StubConnection()
 	c.Assert(err, IsNil)
