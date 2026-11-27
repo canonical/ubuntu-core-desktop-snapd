@@ -194,7 +194,17 @@ capability fsetid,
 /etc/default/locale r,
 /etc/shadow r,
 /etc/shells r,
-/etc/gdm3/custom.conf r,
+# SetAutomaticLogin rewrites custom.conf in place: g_file_set_contents
+# reads the file, creates a temp file in its directory and renames over
+# it. The factory seed keeps custom.conf as the /etc/writable symlink,
+# and AppArmor mediates the resolved path: the first read must be
+# granted on /etc/writable/gdm3/custom.conf. The rename then replaces
+# the symlink with a real file inside the /etc/gdm3 bind mount, so
+# subsequent writes only need the /etc/gdm3 grants.
+/etc/writable/gdm3/custom.conf r,
+/etc/gdm3/ rw,
+/etc/gdm3/custom.conf rw,
+/etc/gdm3/custom.conf.* rw,
 /etc/systemd/system/display-manager.service r,
 /etc/lightdm/lightdm.conf r,
 /run/systemd/seats/ r,
